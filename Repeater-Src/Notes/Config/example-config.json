@@ -1,0 +1,89 @@
+{
+  "AppConfig": {
+    "DefaultUserPassword": "SureBot:ThePassw0rd",
+    "DryRun": "true",
+    "GlobalLinuxCommandFile": "c:\\mnt\\AllLinuxCmdsToRun.txt",
+    "GlobalWindowsCommandFile": "c:\\mnt\\AllWindowsCmdsToRun.txt"
+  },
+  "Servers": [
+    {
+      "Name": "Server001",
+      "ID": "001",
+      "IPAddress": "10.0.0.0",
+      "Port": 22,
+      "Cmds": [
+        "This is a test to @reboot. If not, then oh well. ",
+        "systeminfo > C:\\Users\\Public\\Downloads\\systeminfo.log",
+        "@sysinfo",
+        "dir C:\\Users\\Public\\Downloads",
+        "@download C:\\Users\\Public\\Downloads\\systeminfo.log C:\\mnt\\DEMO-June16\\windows\\systeminfo-remote.log",
+        "@upload C:\\Users\\Public\\Downloads\\file.log C:\\mnt\\DEMO-June16\\windows\\file2.log"
+      ],
+      "NoRepeat": "false",
+      "Reboot": "false",
+      "Frequency": "Monthly"
+    },
+    {
+      "Name": "HomesoftServ",
+      "ID": "Lev001",
+      "IPAddress": "test.com",
+      "Port": 22,
+      "User": "user@user.com",
+      "Password": "aNewPassWordT3st",
+      "Cmds": [
+        "dir",
+        "@reboot",
+        "dir /w /p"
+      ],
+      "Delay": "1",
+      "NoRepeat": "false",
+      "Reboot": "false"
+    },
+    {
+      "Name": "Server001",
+      "ID": "002",
+      "IPAddress": "10.0.0.0",
+      "Port": 22,
+      "User": "David",
+      "Password": "aNewPassWordT3st222",
+      "Cmds": [
+        "df -h",
+        "ls -lisa",
+        "ls -lisa"
+      ],
+      "Delay": "2",
+      "NoRepeat": "false",
+      "Reboot": "true",
+      "Frequency": "Weekly"
+    },
+    {
+      "Name": "Server003",
+      "ID": "003",
+      "IPAddress": "10.0.0.0",
+      "Port": 22,
+      "User": "James",
+      "Password": "AaNewPassWordT3st",
+      "Cmds": [
+        "/bin/bash /home/randy/someshell.sh"
+      ],
+      "Delay": "2",
+      "NoRepeat": "false",
+      "Reboot": "false",
+      "Frequency": "None"
+    },
+    {
+      "Name": "Server003",
+      "ID": "013",
+      "IPAddress": "10.0.0.0",
+      "Port": 22,
+      "Cmds": [
+        "/bin/bash /home/user/user.sh"
+      ],
+      "Delay": "2",
+      "NoRepeat": "false",
+      "Reboot": "false",
+      "Frequency": "None"
+    }
+
+  ]
+} 

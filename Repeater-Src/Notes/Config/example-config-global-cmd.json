@@ -1,0 +1,34 @@
+{
+  "AppConfig": {
+    "DefaultUserPassword": "TheUser:Th3P4ssw0rd",
+    "DryRun": "true",
+    "GlobalLinuxCommandFile": "c:\\mnt\\AllLinuxCmdsToRun.txt",
+    "GlobalWinCommandFile": "C:\\Users\\cwrun\\source\\repos\\TestSSH-CSharp-9.0\\TestSSH\\bin\\Debug\\net5.0\\AllWindowsCmdsToRun.txt"
+  },
+  "Servers": [
+    {
+      "Name": "Server001",
+      "ID": "001",
+      "IPAddress": "192.0.0.0",
+      "Port": 22,
+      "Cmds": [
+        "@sysinfo",
+        "@download c:\\users\\chris_winters\\Downloads\\MicrosoftEdgeSetup.exe  c:\\mnt\\MicrosoftEdgeSetup.exe",
+        "@upload C:\\Users\\cwrun\\GetWindowsProductKey.bat c:/opt_cm/GetWindowsProductKey.bat"
+      ],
+      "NoRepeat": "false",
+      "Reboot": "false",
+      "Frequency": "Monthly"
+    },
+    {
+      "Name": "HomesoftServ",
+      "ID": "Lev001",
+      "IPAddress": "192.0.0.0",
+      "Port": 22,
+      "Delay": "0",
+      "NoRepeat": "false",
+      "Reboot": "false"
+    }
+
+  ]
+}

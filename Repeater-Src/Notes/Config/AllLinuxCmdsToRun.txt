@@ -1,0 +1,5 @@
+uname -a
+cat /etc/fstab
+export A_VARIABLE=trueblue
+echo $A_VARIABLE
+@upload C:\\temp\\TestSSH-Tool\\doc-upload-to-linux-machines-demo.txt /tmp/doc-upload-to-linux-machines-demo.txt

@@ -1,0 +1,13 @@
+set A_VARIABLE=I_AM_A_VARIABLE
+echo %A_VARIABLE%
+wmic qfe list
+@sysinfo
+echo @echo off > c:\demo-test-batch.bat
+echo wmic logicaldisk get DeviceID, FreeSpace, Size >> c:\demo-test-batch.bat
+echo WE WILL NOW RUN BATCH WE HAVE CREATED
+c:\demo-test-batch.bat
+mkdir c:\temp
+@upload C:/temp/TestSSH-Tool/getproductkey.ps1 c:/temp/getproductkey.ps1
+@upload C:\temp\TestSSH-Tool\getproductkey.ps1 c:\temp\getproductkey.ps1
+powershell c:/temp/getproductkey.ps1
+
