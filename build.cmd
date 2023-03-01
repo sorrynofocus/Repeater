@@ -3,7 +3,7 @@
 @REM https://github.com/dotnet/core/issues/5409
 
 set CURDIR=%CD%%
-set PRODUCTFILE=TestSSH
+set PRODUCTFILE=Repeater-Src
 set PRODUCTFILEMAC=%PRODUCTFILE%-mac
 set PRODUCTFILEWIN=%PRODUCTFILE%.exe
 set SOLUTIONFILE=%PRODUCTFILE%.sln
@@ -21,6 +21,9 @@ dotnet publish --framework net5.0  -r linux-x64 --configuration Release --self-c
 dotnet build --framework net5.0  -r osx.10.13-x64 --configuration Release --verbosity minimal
 dotnet publish --framework net5.0  -r osx.10.13-x64 --configuration Release --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true --verbosity minimal
 
-echo Product location: %CURDIR%/%PRODUCTFILE%/bin/Release/netcoreapp3.1/win10-x64/publish/%PRODUCTFILE%
+echo Product location -Windows- : %CURDIR%\%PRODUCTFILE%\bin\Release\net5.0\win10-x64\publish\
+echo Product location -Linux- : %CURDIR%\%PRODUCTFILE%\bin\Release\net5.0\linux-x64\publish\
+echo Product location -Mac OS- : %CURDIR%\%PRODUCTFILE%\bin\Release\net5.0\osx.10.13-x64\publish\
+
 
 

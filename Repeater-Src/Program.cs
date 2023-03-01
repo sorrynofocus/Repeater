@@ -26,7 +26,7 @@ namespace com.repeater.program
     {
 
         public static string configFile = ".\\config.json";
-        public static readonly string APP_VERSION = "1.2.3";
+        public static readonly string APP_VERSION = "alpha-1.2.3";
 
         //Set up ssh, scp, and ftp clients
         public static SSHConn sshconn = new SSHConn();
@@ -53,7 +53,7 @@ namespace com.repeater.program
         static void Main(string[] args)
         {
 
-            System.Console.WriteLine("REPEATER PROTOTYPE - CHRIS WINTERS.\n");
+            System.Console.WriteLine("Repeater Version {0} - by C. Winters", APP_VERSION);
 
             //var taskKeys = new System.Threading.Tasks.Task(ReadKeys);
             //taskKeys.Start();
@@ -189,11 +189,19 @@ namespace com.repeater.program
 
             if ( (dictArgs.ContainsKey("help")) || (dictArgs.ContainsKey("?")) )
             {
-                System.Console.WriteLine("config {full path to config file}");
-                System.Console.WriteLine("showconfig  -show configuration");
-                System.Console.WriteLine("defaultuser {username}");
-                System.Console.WriteLine("defaultpassword {password}");
-                System.Console.WriteLine("defaultuserpassword {username:password}");
+                System.Console.WriteLine("\nOptions:");
+                System.Console.WriteLine("config [full path to config file] - load a config from a location");
+                System.Console.WriteLine("showconfig  -show configuration loaded from config file");
+                System.Console.WriteLine("defaultuser {username}  -sets the default username");
+                System.Console.WriteLine("defaultpassword {password}   -sets the default password");
+                System.Console.WriteLine("defaultuserpassword {username:password}  - sets the global default user and password");
+                System.Console.WriteLine("encrypt -u [user] -p [password]  - encrypts user password to store in config file. *not implemented*");
+                System.Console.WriteLine("cred -serverid [serverid] [credentials]  - pass in the encrypted credentials rather than from config file. *not implemented*");
+
+                System.Console.WriteLine("cmd [verb] [noun] [option]");
+                System.Console.WriteLine("Verbs: run");
+                System.Console.WriteLine("Noun: server");
+                System.Console.WriteLine("\nExample: Run a specific server, by ID");
                 System.Console.WriteLine("-cmd run server {serverID}");
                 return;
             }
@@ -204,7 +212,7 @@ namespace com.repeater.program
 
             if (oConfigs.ReadConfigJSON()!=0)
             {
-                System.Console.WriteLine("Well shit. Config is bad. Check for duplicate server IDs if the config file exist.");
+                System.Console.WriteLine("Config is bad. Check for duplicate server IDs if the config file exist.");
             }
 
             StartSvrWorkByID();
