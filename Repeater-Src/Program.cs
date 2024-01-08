@@ -29,7 +29,7 @@ namespace com.repeater.program
     {
 
         public static string configFile = ".\\config.json";
-        public static readonly string APP_VERSION = "alpha-1.2.3";
+        public static readonly string APP_VERSION = "alpha-1.2.4";
 
         //Set up ssh, scp, and ftp clients
         public static SSHConn sshconn = new SSHConn();
