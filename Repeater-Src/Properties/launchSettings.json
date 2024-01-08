@@ -1,7 +1,9 @@
 {
   "profiles": {
-    "Repeater": {
-      "commandName": "Project"
+    "Repeater-Debugrun": {
+      "commandName": "Project",
+      "commandLineArgs": "-cmd attach server \"ubuntu-vm\"",
+      "workingDirectory": "C:\\Users\\cwrun\\source\\github-repo\\sorrynofocus\\Repeater\\Repeater-Src\\bin\\Debug\\net5.0"
     }
   }
 }

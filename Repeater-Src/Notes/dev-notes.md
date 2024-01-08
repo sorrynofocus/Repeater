@@ -72,7 +72,7 @@ each server. If all the servers do the same, the global files can be used to pro
 TODO: pass in --createconfig to create template
 
 04/25/2022
-Tested on MAc, Widnows , and linux machine.
+Tested on MAc, Windows, and linux machine.
 FAilure trying to copy from a mapped drive to a local. We forget that SSH does not have access to drives because we are logged into another workstation. 
 So, we get
 Unhandled exception. Renci.SshNet.Common.ScpException: scp: Z:/test/sdksetup.exe: No such file or directory
@@ -156,4 +156,24 @@ Doesn't work in commands file:
 @upload C:\temp\TestSSH-Tool\getproductkey.ps1 c:\temp\getproductkey.ps1
 Does work in commands file:
 @upload C:/temp/TestSSH-Tool/getproductkey.ps1 c:/temp/getproductkey.ps1
+
+1-8-2024
+It's been a long time!
+What's new?
+ - New function AttachSvrByID() where you can attach to a server in the config via basic SSH. You can list directories, examine files, run 
+   basic Os commands. Editing files is a bit of a challenge, but this is not as important as just getting basic ssh working. This took some 
+   time to get working. The function si not finished as it needs commands revamping. And...
+ - I've discovered why sometimes the isWindows, isLinux, or isMac() are not working. This is because we're detecting OS by interoperable 
+   means. The correct functions that work as a remote detection are the functions in sshconn-help.cs-- see DetectOS(). We may need to move
+   these commands over into the CommandUtils.cs and rename the ones that use interoperable 
+ - Added new command line arg: -cmd attach server {ServerID} this is the activate the ssh shell as described above. Currently, you can use 
+   server ID to connect to. For credentials, you can use the ones from config. Using a server IP alone is not supported. It's best to add 
+   it to the config.
+ TODOs:
+ - encrypt/decrypt password
+ - Add SSH key authentication
+ - AttachSvrByID() -finish it.
+ - Clean up code
+ - Some command line args functionality are missing. Example: "--configme"
+ - Go over older bugs.
 
