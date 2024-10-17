@@ -119,6 +119,7 @@ namespace com.winters.config
         // -------------------------------
         public RootConfig oConfigOptions = new RootConfig();
 
+        //TODO - if this is cross-platform build, we need to adjust directory paths marks.
         public Configs(string configFile = ".\\config.json")
         {
             if (configFile.Length == 0)

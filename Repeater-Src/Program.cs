@@ -29,7 +29,7 @@ namespace com.repeater.program
     {
 
         public static string configFile = ".\\config.json";
-        public static readonly string APP_VERSION = "alpha-1.2.4";
+        public static readonly string APP_VERSION = "alpha-1.2.5";
 
         //Set up ssh, scp, and ftp clients
         public static SSHConn sshconn = new SSHConn();
@@ -97,10 +97,71 @@ namespace com.repeater.program
                 //Override the config file
                 configFile = dictArgs["config"];
 
+
+            if (dictArgs.ContainsKey("version"))
+            {
+                System.Console.WriteLine("Repeater Version {0} - by C. Winters", APP_VERSION);
+                Environment.Exit(0);
+            }
+
             //configme switch
             //If you don't have a config file and want to start your own... 
+            // example-config.json is created in same directory with a few samples.
             if (dictArgs.ContainsKey("configme"))
             {
+                
+                string GetcurPathExe = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string ConfigPath = GetcurPathExe + "\\example-config.json";
+
+                if (GetcurPathExe.Contains("/"))
+                {
+                    //We're on unix type system, modify path
+                    ConfigPath = "/" + ConfigPath.Replace("\\", "/");
+                }
+
+                oConfigs.ConfigFile = ConfigPath;
+
+                oConfigs.oConfigOptions.AppConfig = new AppConfig();
+
+
+                oConfigs.oConfigOptions.AppConfig.DryRun = "true";
+                oConfigs.oConfigOptions.AppConfig.DefaultPort = "20";
+                oConfigs.oConfigOptions.Servers = new List<Server>
+                {
+                    new Server()
+                    {
+                        Name = "Server2",
+
+                        ID = "ServerID2",
+                        IPAddress = "192.168.1.2",
+                        Cmds = new List<string>
+                        {
+                            "@sysinfo",
+                            "help"
+                        },
+                        Delay ="100",
+                        Reboot = "false"
+                    },
+                    new Server()
+                    {
+                        Name = "Server3",
+                        ID = "ServerID3",
+                        IPAddress = "192.168.1.3",
+                        Cmds = new List<string>
+                        {
+                            "@sysinfo",
+                            "help"
+                        },
+                        Delay ="100",
+                        Reboot = "false"
+                    }
+                };
+
+                //Since we've built up our configuration _manually_, we m,ust set the config loaded flag to save.
+                oConfigs.oConfigOptions.ConfigLoaded = true;    
+                oConfigs.SaveConfig();
+                System.Console.WriteLine("Example config saved: " + oConfigs.ConfigFile );
+                Environment.Exit(0);
             }
 
             //nolog switch
@@ -145,7 +206,7 @@ namespace com.repeater.program
                     oConfigs.ConfigFile = configFile;
                     if (oConfigs.ReadConfigJSON() != 0)
                     {
-                        System.Console.WriteLine("Well shit. Config is bad. Check for duplicate server IDs if the config file exist.");
+                        System.Console.WriteLine("Invalid config file. Check for duplicate server IDs if the config file exist.");
                     }
 
                     string sDefaultUser = string.Empty;
@@ -415,7 +476,7 @@ namespace com.repeater.program
         }
 
         //This function will enable user to attach to a server and run commands until user disconnects.
-        // The shell works, but we need to re-do PrcessCommands. Thishas all been tested but commands need to detect OS and all that
+        // The shell works, but we need to re-do PrcessCommands. This has all been tested but commands need to detect OS and all that
         // 1-7-2024 cw
         public static void AttachSvrByID(string serverID = "@all")
         {
@@ -642,20 +703,20 @@ namespace com.repeater.program
 
 
                     //Is linux, windows or macos?
-                    if (sshconn.isWindows())
-                    {
-                        ;
-                    }
+                    //if (sshconn.isWindows())
+                    //{
+                    //    ;
+                    //}
 
-                    if (sshconn.isLinux())
-                    {
-                        ;
-                    }
+                    //if (sshconn.isLinux())
+                    //{
+                    //    ;
+                    //}
 
-                    if (sshconn.isMacOS())
-                    {
-                        ;
-                    }
+                    //if (sshconn.isMacOS())
+                    //{
+                    //    ;
+                    //}
 
 
 
@@ -1071,15 +1132,23 @@ namespace com.repeater.program
                         if (bDryRun)
                         {
                             //Well, we have to load up all the command lines in both windows/linux/mac because we don't know the OS.
-                            ServerItem.Cmds = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile);
+                            if (oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile !=null)
+                                ServerItem.Cmds = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile);
+
                             //ServerItem.Cmds = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile);
                             //List<string> tmpCmds = new List<string>(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile));
-                            List<string> tmpCmds2 = new List<string>(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile));
-//                            ServerItem.Cmds.Add("--WINDOWS COMMANDS---");
+                            //List<string> tmpCmds2 = new List<string>(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile));
+                            //                            ServerItem.Cmds.Add("--WINDOWS COMMANDS---");
                             //ServerItem.Cmds.AddRange(tmpCmds);
-//                            ServerItem.Cmds.Add("--LINUX/MAC COMMANDS---");
-                            ServerItem.Cmds.AddRange(tmpCmds2);
+                            //                            ServerItem.Cmds.Add("--LINUX/MAC COMMANDS---");
+                            //ServerItem.Cmds.AddRange(tmpCmds2);
 
+                            List<string> tmpCmds2 = new List<string>();
+
+                            if (oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile != null)
+                            {
+                                tmpCmds2.AddRange(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile));
+                            }
                         }
 
                         if (ServerItem.Cmds == null)

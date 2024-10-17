@@ -177,3 +177,11 @@ What's new?
  - Some command line args functionality are missing. Example: "--configme"
  - Go over older bugs.
 
+10-8-2024
+It's been a long time -again!
+- Fixed a bug where if dry run and loading global run files (linux/windows) will produce unhandeld exception.
+   Unhandled exception. System.ArgumentNullException: Value cannot be null. (Parameter 'collection')
+   at System.Collections.Generic.List`1..ctor(IEnumerable`1 collection)
+   at com.repeater.program.RepeaterPrg.StartSvrWorkByID(String serverID)
+   at com.repeater.program.RepeaterPrg.Main(String[] args)
+- Changing a few strings displaying status
