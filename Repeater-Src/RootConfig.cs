@@ -220,7 +220,7 @@ namespace com.winters.config
                 return;
             }
 
-            System.Console.WriteLine("DefaultUserPasswd     : {0}", oConfigOptions.AppConfig.DefaultUserPassword);
+            System.Console.WriteLine("DefaultUserPasswd     : {0}", HideSecretDisplay(oConfigOptions.AppConfig.DefaultUserPassword));
             System.Console.WriteLine("Default Port          : {0}", oConfigOptions.AppConfig.DefaultPort );
             System.Console.WriteLine("DryRun                : {0}", oConfigOptions.AppConfig.DryRun);
 
@@ -260,6 +260,80 @@ namespace com.winters.config
             System.Console.WriteLine("----------------------------------------------------------");
 
         }
+
+        /// <summary>
+        /// Hides the secret at display. All characters, but last four, are shown.
+        /// </summary>
+        /// <param name="secret">string to the secret used</param>
+        /// <returns>reformatted where all but last four characters are displayed.</returns>
+        /// 
+        // This function was designed to hide secrets during display. Our secrets are in the format of:
+        // "username:secret"
+        // If user uses the ':' as a part of password, then we decide the _last_ colon is the effective
+        // separator of the secret.
+        //
+        // Test Scenarios:
+        //
+        // Single colon:
+        // Input: "ThisIsASecret:ThisIsMyPassword"
+        // Output: "******ecret:********word"
+        //
+        // Multiple colons:
+        // Input: "This:Is:A:Secret:Password"
+        // Output: "**************ret:*******word"
+        //
+        // No colon:
+        // Input: "JustAPlainPassword"
+        // Output: "***********word"
+        //
+        // Short secret:
+        // Input: "abc"
+        // Output: "***"
+
+        public string HideSecretDisplay(string secret)
+        {
+            if (string.IsNullOrEmpty(secret))
+                return null;
+
+            //Find the last colon in the string, if any
+            int lastColonIndex = secret.LastIndexOf(':');
+
+            if (lastColonIndex != -1)
+            {
+                // Split the string into the part before and after the last colon
+                string beforeColon = secret.Substring(0, lastColonIndex);
+                string afterColon = secret.Substring(lastColonIndex + 1);
+
+                // Mask each part using inline private MaskString()
+                string maskedBeforeColon = MaskString(beforeColon, 4);
+                string maskedAfterColon = MaskString(afterColon, 4);
+
+                //REmix and return
+                return (maskedBeforeColon + ":" + maskedAfterColon);
+            }
+
+            // No ':' found? Mask the whole thing, return
+            return (MaskString(secret, 4));
+        }
+
+        /// <summary>
+        /// Inline masking function to mask sensitive strings at customized visible chars
+        /// </summary>
+        /// <param name="input">string input to mask</param>
+        /// <param name="visibleChars">How many visible characters you want at end of string</param>
+        /// <returns></returns>
+        private string MaskString(string input, int visibleChars)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            if (input.Length <= visibleChars)
+                return new string('*', input.Length);
+
+            int hiddenChars = input.Length - visibleChars;
+            return new string('*', hiddenChars) + input.Substring(hiddenChars);
+        }
+
 
     }
 }

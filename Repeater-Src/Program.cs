@@ -1,5 +1,21 @@
-﻿
-using Renci.SshNet;
+﻿/*
+* C.Winters / US / Arizona / Thinkpad T15g 
+*
+* Purpose:
+* Repeater is a tool that uses SSH comms to run tasks or automation on virtual or static machine nodes. 
+* Repeater can be configured for individual or global credentials to log into a system. The configuration 
+* is in JSON format and a dry-run test can be used to test out output.
+* 
+* My current usage is - I have two machines. Instead of remote desktop, I can call Repeater to display
+* current information on the systems, send an event log to the server reporting I am no longer using it, 
+* and shuts them both down after writing the event log. There are many other uses. 
+*
+* I realise Ansible is a product out there you can use. But, when I started writing this, I was aware, 
+* but never used it. So, I wrote my own. I may revamp this to follow the "playbook" technique, 
+* because the Global commands file isn't the best solution as "playbooks" are. 
+* 
+* This project is currently under development. See "APP_VERSION" string in this file for release version.
+*/
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,20 +24,10 @@ using System.Text;
 using com.winters.config;
 using com.winters.sshconnhlp;
 using com.winters.commandutils;
-using System.Threading;
-using System.Globalization;
+using Renci.SshNet;
 using Renci.SshNet.Common;
-
-
-
-//NOTES:
-/*
-Data is in name/value pairs
-Data is separated by commas
-Curly braces hold objects
-Square brackets hold arrays
-JSON intro: https://www.w3schools.com/js/js_json_intro.asp
- */
+using com.winters.securityhelper;
+using Repeater;
 
 namespace com.repeater.program
 {
@@ -29,7 +35,7 @@ namespace com.repeater.program
     {
 
         public static string configFile = ".\\config.json";
-        public static readonly string APP_VERSION = "alpha-1.2.5";
+        public static readonly string APP_VERSION = "alpha-1.2.6";
 
         //Set up ssh, scp, and ftp clients
         public static SSHConn sshconn = new SSHConn();
@@ -68,27 +74,50 @@ namespace com.repeater.program
             //Command line arguments. Supports example params like /param {choice}, -param {choice}, and --param {choice}
             string[] sPrgArgs = Environment.GetCommandLineArgs();
 
-            string s1;
+            // Dictionary to store parsed arguments
+            Dictionary<string, string> dictArgs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            Dictionary<string, string> dictArgs = new Dictionary<string, string>();
-
-            for (int iIndex = 1; iIndex < sPrgArgs.Length; iIndex += 2)
+            for (int iIndex = 1; iIndex < sPrgArgs.Length; iIndex++)
             {
-                string sIndexArg = sPrgArgs[iIndex].Replace("/", "").Replace("-", "").Replace("--", "");
+                string currentArg = sPrgArgs[iIndex];
 
-                try
+                // Handle switches and parameters like -cmd, --cmd
+                if (currentArg.StartsWith("/") || currentArg.StartsWith("-"))
                 {
-                    if (sPrgArgs[iIndex].Length > 1)
-                        s1 = sPrgArgs[iIndex + 1];
+                    string key = currentArg.TrimStart('/', '-', '-');
 
-                    dictArgs.Add(sIndexArg, sPrgArgs[iIndex + 1]);
+                    // Check if the next argument is a value or another switch
+                    string value = (iIndex + 1 < sPrgArgs.Length && !sPrgArgs[iIndex + 1].StartsWith("/") && !sPrgArgs[iIndex + 1].StartsWith("-"))
+                                   ? sPrgArgs[++iIndex]
+                                   : string.Empty;
+
+                    if (!dictArgs.ContainsKey(key))
+                        dictArgs.Add(key, value);
                 }
-                catch
+                else if (currentArg.Contains("=")) // Handle sub-command arguments like "password=ThisIsMyPassword"
                 {
-                    //Trying to add the same key - won't work.
-                    dictArgs.Add(sIndexArg, "");
-                }
+                    string[] keyValue = currentArg.Split('=');
 
+                    if (keyValue.Length == 2)
+                    {
+                        string key = keyValue[0].Trim();
+                        string value = keyValue[1].Trim();
+
+                        if (!dictArgs.ContainsKey(key))
+                            dictArgs.Add(key, value);
+                    }
+                }
+                else // Handle cases where parameter value follows the key directly (e.g., password ThisIsMyPassword)
+                {
+                    string key = currentArg.Trim();
+
+                    // Ensure we have a value after the key
+                    if (iIndex + 1 < sPrgArgs.Length && !sPrgArgs[iIndex + 1].StartsWith("/") && !sPrgArgs[iIndex + 1].StartsWith("-"))
+                    {
+                        string value = sPrgArgs[++iIndex].Trim();
+                        dictArgs.Add(key, value);
+                    }
+                }
             }
 
             //Override configuration file switch
@@ -211,7 +240,13 @@ namespace com.repeater.program
 
                     string sDefaultUser = string.Empty;
 
-                    string serverID = dictArgs["server"];
+                    string serverID = dictArgs.ContainsKey("server") ? dictArgs["server"].Trim() : string.Empty;
+                    
+                    if (string.IsNullOrWhiteSpace(serverID))
+                    {
+                        Console.WriteLine("Server ID is missing or invalid.");
+                        return;
+                    }
 
                     StartSvrWorkByID(serverID);
 
@@ -239,7 +274,7 @@ namespace com.repeater.program
 
                     string sDefaultUser = string.Empty;
 
-                    string serverID = dictArgs["server"];
+                    string serverID = dictArgs["server"].Trim();
 
                     //StartSvrWorkByID(serverID);
                     AttachSvrByID(serverID);
@@ -254,6 +289,7 @@ namespace com.repeater.program
             }
 
 
+
             //Override log file usage switch
             // /log c:\files_processed.log
             // If you want to use your own log file, use this switch.
@@ -264,14 +300,102 @@ namespace com.repeater.program
 
             }
 
-            //encrypt a password to use as update credentials
-            // -encrypt mypassword
-            if (dictArgs.ContainsKey("encrypt"))
-            {
-                //                string sEncryptPasswd = string.Empty;
 
-                //                return;
+
+
+
+
+            //if (dictArgs.TryGetValue("cmd", out var command) && command.Equals("encrypt", StringComparison.OrdinalIgnoreCase))
+            //{
+            //    Console.WriteLine("Encrypt command detected!");
+
+            //    if (dictArgs.TryGetValue("password", out var password))
+            //    {
+            //        Console.WriteLine($"Password: {password}");
+            //    }
+
+            //    if (dictArgs.TryGetValue("key", out var key))
+            //    {
+            //        Console.WriteLine($"Key: {key}");
+            //    }
+            //}
+
+
+
+
+
+
+
+
+            //encrypt a password to use as update credentials
+            // Two examples to use:
+            // -cmd encrypt password=MyPassword key=123456789ABC
+            // -cmd encrypt password ThisIsMyPassword Key 123456789AB
+            
+            //if ( dictArgs.ContainsKey("cmd") && 
+            //     dictArgs.ContainsValue("encrypt") 
+            //   )
+            if (dictArgs.TryGetValue("cmd", out var command) && command.Equals("encrypt", StringComparison.OrdinalIgnoreCase))
+            {
+                
+                if (! (dictArgs.TryGetValue("password", out string stringToEncrypt)) ||
+                      !(dictArgs.TryGetValue("key", out string stringEncryptionKey))
+                   )
+                {
+                    System.Console.WriteLine(StringTable.errInvalidCmdEncrypt);
+                    return;
+                }
+
+                if ( string.IsNullOrEmpty(stringToEncrypt) ||
+                     string.IsNullOrEmpty(stringEncryptionKey) 
+                    )
+                {
+                    System.Console.WriteLine(StringTable.setupEncrypt);
+                    stringToEncrypt = System.Console.ReadLine();
+
+                    stringEncryptionKey = System.Console.ReadLine();
+                    System.Console.WriteLine(StringTable.setupEnterEncryptionKey);
+                }
+
+
+                //Set up encryption key (password) and secure key (salt)
+                com.winters.securityhelper.SecurityHelper.EncryptionKey = stringEncryptionKey;
+                //com.winters.securityhelper.SecurityHelper.Salt = stringSalt;
+                
+                //Randomizer. 
+                //SecurityHelper.EncryptionKey = SecurityHelper.GenerateRandomString(32);
+                SecurityHelper.Salt = SecurityHelper.ConvertByteArrayToString(SecurityHelper.GenerateRandomBytes(32));
+
+                //Initialize security validation
+                if (com.winters.securityhelper.SecurityHelper.Init())
+                {
+
+                    //Encapsulation encrypt and decrypt
+                    string encryptedText = com.winters.securityhelper.SecurityHelper.Encrypt(stringToEncrypt);
+                    string decryptedText = com.winters.securityhelper.SecurityHelper.Decrypt(encryptedText);
+
+                    string uncombinedencryptionkey = SecurityHelper.GetEncryptionKey(SecurityHelper.GetCombinedKeySalt());
+                    string decryptByCombinedKeySalt = SecurityHelper.DecryptByCombinedKeySalt(encryptedText, SecurityHelper.GetCombinedKeySalt());
+
+                    Console.WriteLine();
+                    Console.WriteLine("Store these value soemwhere safe!");
+                    Console.WriteLine();
+                    Console.WriteLine("Use ONLY the SECURE KEY to decrypt password (or any encrypted text)");
+                    Console.WriteLine($"Password: {decryptedText}");
+                    Console.WriteLine($"Secret Key: {SecurityHelper.EncryptionKey}");
+                    Console.WriteLine($"Secure Key: {SecurityHelper.GetCombinedKeySalt()}");
+                    Console.WriteLine();
+
+                } //End of SecurityHelper.Init()
+                else
+                {
+                    Console.WriteLine("Invalid salt! No null or whitespaces, invalid chars, or not multiples of 4 in length.");
+                }
+
+
+                return;
             }
+            
 
 
             //... More configs here.... 

@@ -1,5 +1,14 @@
 ﻿This is a MARKDOWN file.
 
+```
+NOTES:
+Data is in name/value pairs
+Data is separated by commas
+Curly braces hold objects
+Square brackets hold arrays
+JSON intro: https://www.w3schools.com/js/js_json_intro.asp
+``` 
+
 July 21 2021
 
 Most of the work has been configuration and processing configuration. As of this date, conmfiguration is parsing correct. The final config format will 
@@ -185,3 +194,11 @@ It's been a long time -again!
    at com.repeater.program.RepeaterPrg.StartSvrWorkByID(String serverID)
    at com.repeater.program.RepeaterPrg.Main(String[] args)
 - Changing a few strings displaying status
+
+11-18-2024
+- Added security credential helper. Modified RootConfig to help mask sensitive data. This was pretty huge and only prelimaries
+  have been added. See command line option "encrypt". This is where I've started using the library (See catsclasw security in 
+- repo... and _that_ needs updating with this one! Found bugs!)
+- Updated command line processer.
+- Fixed a couple bugs.
+- Added constants for string table. THe need to move strings to a table for later localization translation.
