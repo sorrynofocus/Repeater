@@ -2,7 +2,7 @@
   "profiles": {
     "Repeater-Debugrun": {
       "commandName": "Project",
-      "commandLineArgs": "-cmd encrypt password=MyPassword key=123456789ABC",
+      "commandLineArgs": "-cmd encrypt password=chris key=winters",
       "workingDirectory": "C:\\Users\\cwrun\\source\\github-repo\\sorrynofocus\\Repeater\\Repeater-Src\\bin\\Debug\\net5.0"
     }
   }

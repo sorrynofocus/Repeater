@@ -9,6 +9,7 @@ namespace Repeater
 
     public static class StringTable
     {
+        //Currently adding most strings here. TODO
 
         public const string setupEncrypt = 
                             @"Encryption setup requires a PASSWORD and a secret key
@@ -31,6 +32,8 @@ namespace Repeater
                                 -cmd encrypt password=MyPassword key=123456789ABC
                                 -cmd encrypt password ThisIsMyPassword Key 123456789AB
                             ";
+
+        public const string errInvalidCmdDecryptNoValues = "Enter the (string) and (securekey) key to decrypt.";
 
 
     }

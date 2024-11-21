@@ -15,6 +15,7 @@
 * because the Global commands file isn't the best solution as "playbooks" are. 
 * 
 * This project is currently under development. See "APP_VERSION" string in this file for release version.
+* After all code is working, it'll be cleaned up ^_-
 */
 using System;
 using System.Collections.Generic;
@@ -28,12 +29,12 @@ using Renci.SshNet;
 using Renci.SshNet.Common;
 using com.winters.securityhelper;
 using Repeater;
+using static com.winters.securityhelper.SecurityHelper;
 
 namespace com.repeater.program
 {
     class RepeaterPrg
     {
-
         public static string configFile = ".\\config.json";
         public static readonly string APP_VERSION = "alpha-1.2.6";
 
@@ -68,6 +69,21 @@ namespace com.repeater.program
             //taskKeys.Start();
             //var tasks = new[] { taskKeys };
             //System.Threading.Tasks.Task.WaitAll(tasks);
+
+            //Setup "applog.txt" as a file to log to - and no logging to console...
+            SecurityHelper.Logger = new SecurityHelper.CustomLogger(logToFile: true, filePath: "applog.log", appendToFile: true);
+            SecurityHelper.Logger?.LogInfo("APPL Repeater Version " + APP_VERSION + " - by C. Winters");
+
+            //Set up a console based log, no writing to file.
+            SecurityHelper.CustomLogger appLogger = new SecurityHelper.CustomLogger();
+            SecurityHelper.Logger = appLogger;
+            appLogger?.LogInfo("Repeater Version " + APP_VERSION + " - by C. Winters");
+
+            //Setup "security.log" as a file to log to and no logging to console.
+            SecurityHelper.CustomLogger securityLogger = new SecurityHelper.CustomLogger( logToFile: true, filePath: "security.log", appendToFile: true);
+            SecurityHelper.Logger = securityLogger;
+            securityLogger?.LogInfo("Repeater Version " + APP_VERSION + " - by C. Winters");
+
 
 
             #region Parameters
@@ -138,7 +154,9 @@ namespace com.repeater.program
             // example-config.json is created in same directory with a few samples.
             if (dictArgs.ContainsKey("configme"))
             {
-                
+                SecurityHelper.Logger?.LogInfo("configme args pass, starting config template..");
+
+
                 string GetcurPathExe = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
                 string ConfigPath = GetcurPathExe + "\\example-config.json";
 
@@ -301,32 +319,6 @@ namespace com.repeater.program
             }
 
 
-
-
-
-
-            //if (dictArgs.TryGetValue("cmd", out var command) && command.Equals("encrypt", StringComparison.OrdinalIgnoreCase))
-            //{
-            //    Console.WriteLine("Encrypt command detected!");
-
-            //    if (dictArgs.TryGetValue("password", out var password))
-            //    {
-            //        Console.WriteLine($"Password: {password}");
-            //    }
-
-            //    if (dictArgs.TryGetValue("key", out var key))
-            //    {
-            //        Console.WriteLine($"Key: {key}");
-            //    }
-            //}
-
-
-
-
-
-
-
-
             //encrypt a password to use as update credentials
             // Two examples to use:
             // -cmd encrypt password=MyPassword key=123456789ABC
@@ -335,7 +327,7 @@ namespace com.repeater.program
             //if ( dictArgs.ContainsKey("cmd") && 
             //     dictArgs.ContainsValue("encrypt") 
             //   )
-            if (dictArgs.TryGetValue("cmd", out var command) && command.Equals("encrypt", StringComparison.OrdinalIgnoreCase))
+            if (dictArgs.TryGetValue("cmd", out string encryptcommand) && encryptcommand.Equals("encrypt", StringComparison.OrdinalIgnoreCase))
             {
                 
                 if (! (dictArgs.TryGetValue("password", out string stringToEncrypt)) ||
@@ -357,13 +349,13 @@ namespace com.repeater.program
                     System.Console.WriteLine(StringTable.setupEnterEncryptionKey);
                 }
 
+                
+                //SecurityHelper.Logger?.LogInfo("Starting encryption client...");
+                securityLogger?.LogInfo("SECURITY LOGGER -LINE 386 Starting encryption client...");
+                SecurityHelper.Logger?.LogInfo("PLAIN LOGGER -LINE 387  Bop!");
 
                 //Set up encryption key (password) and secure key (salt)
                 com.winters.securityhelper.SecurityHelper.EncryptionKey = stringEncryptionKey;
-                //com.winters.securityhelper.SecurityHelper.Salt = stringSalt;
-                
-                //Randomizer. 
-                //SecurityHelper.EncryptionKey = SecurityHelper.GenerateRandomString(32);
                 SecurityHelper.Salt = SecurityHelper.ConvertByteArrayToString(SecurityHelper.GenerateRandomBytes(32));
 
                 //Initialize security validation
@@ -378,24 +370,109 @@ namespace com.repeater.program
                     string decryptByCombinedKeySalt = SecurityHelper.DecryptByCombinedKeySalt(encryptedText, SecurityHelper.GetCombinedKeySalt());
 
                     Console.WriteLine();
-                    Console.WriteLine("Store these value soemwhere safe!");
+                    Console.WriteLine($"Debug info:");
+                    Console.WriteLine($"Secure Key: {SecurityHelper.GetCombinedKeySalt()}");
+                    Console.WriteLine($"----");
+
+                    //Gets the secure key and displays it as a string
+                    string uncombinedsaltbytesstr = SecurityHelper.GetSaltBytesStr(SecurityHelper.GetCombinedKeySalt());
+
+                    //Gets the secure key and displays it as a byte array
+                    byte[] uncombinedsaltbytes = SecurityHelper.GetSalt(SecurityHelper.GetCombinedKeySalt());
+
+                    Console.WriteLine($"customKey: {SecurityHelper.EncryptionKey}");
+                    Console.WriteLine($"saltString: {SecurityHelper.Salt}");
+                    Console.WriteLine($"combinedSecurityStorage: {SecurityHelper.GetCombinedKeySalt()}");
+                    Console.WriteLine($"encryptedText: {encryptedText}");
+                    Console.WriteLine($"decryptedText: {decryptedText}");
+
+                    Console.WriteLine("DECRYPTIONED:");
+                    Console.WriteLine($"uncombinedencryptionkey: {uncombinedencryptionkey}");
+                    Console.WriteLine($"uncombinedsaltbytesStr: {uncombinedsaltbytesstr}");
+                    Console.Write("uncombinedsaltBytes: ");
+
+                    foreach (byte b in uncombinedsaltbytes)
+                    {
+                        Console.Write($"{b:X2} ");
+                    }
+                    Console.WriteLine();
+
+                    Console.WriteLine($"decryptByCombinedKeySalt: {decryptByCombinedKeySalt}\n");
+                    Console.WriteLine("Store these value somewhere safe!");
                     Console.WriteLine();
                     Console.WriteLine("Use ONLY the SECURE KEY to decrypt password (or any encrypted text)");
                     Console.WriteLine($"Password: {decryptedText}");
+                    Console.WriteLine($"Encrypted Password: {encryptedText}");
+                    Console.WriteLine($"Secret Key: {SecurityHelper.EncryptionKey}");
+                    Console.WriteLine($"Secure Key: {SecurityHelper.GetCombinedKeySalt()}");
+                    Console.WriteLine();
+                    return;
+                } //End of SecurityHelper.Init()
+                else
+                    Console.WriteLine("Invalid salt! No null or whitespaces, invalid chars, or not multiples of 4 in length.");
+                return;
+            }
+
+            if (dictArgs.TryGetValue("cmd", out var decryptcommand) && decryptcommand.Equals("decrypt", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!(dictArgs.TryGetValue("string", out string stringToDecrypt)) ||
+                      !(dictArgs.TryGetValue("securekey", out string stringSecureKey))
+                   )
+                {
+                    System.Console.WriteLine(StringTable.errInvalidCmdDecryptNoValues);
+                    return;
+                }
+
+                //Scenario:
+                // -cmd encrypt password ThisPassword key NoMoreSecrets
+                /*
+                 Debug info:
+                Secure Key: 4E6F4D6F7265536563726574733A384B6E704855774B4E556B49694549396C4C4A612F79566D69776E444D4F6B546555486A7854656E6250773D
+                ----
+                customKey: NoMoreSecrets
+                saltString: 8KnpHUwKNUkIiEI9lLJa/yVmiwnDMOkTeUHjxTenbPw=
+                combinedSecurityStorage: 4E6F4D6F7265536563726574733A384B6E704855774B4E556B49694549396C4C4A612F79566D69776E444D4F6B546555486A7854656E6250773D
+                encryptedText: PbcrKFupwvchBjnw4eAc2dEepP1ZjEXWZUKDouGcYjg=
+                decryptedText: ThisPassword
+                DECRYPTIONED:
+                uncombinedencryptionkey: NoMoreSecrets
+                uncombinedsaltbytesStr: 8KnpHUwKNUkIiEI9lLJa/yVmiwnDMOkTeUHjxTenbPw=
+                uncombinedsaltBytes: F0 A9 E9 1D 4C 0A 35 49 08 88 42 3D 94 B2 5A FF 25 66 8B 09 C3 30 E9 13 79 41 E3 C5 37 A7 6C FC
+                decryptByCombinedKeySalt: ThisPassword
+
+                Store these value somewhere safe!
+
+                Use ONLY the SECURE KEY to decrypt password (or any encrypted text)
+                Password: ThisPassword
+                Encrypted Password: PbcrKFupwvchBjnw4eAc2dEepP1ZjEXWZUKDouGcYjg=
+                Secret Key: NoMoreSecrets
+                Secure Key: 4E6F4D6F7265536563726574733A384B6E704855774B4E556B49694549396C4C4A612F79566D69776E444D4F6B546555486A7854656E6250773D
+                 */
+                // -cmd decrypt string PbcrKFupwvchBjnw4eAc2dEepP1ZjEXWZUKDouGcYjg= securekey 4E6F4D6F7265536563726574733A384B6E704855774B4E556B49694549396C4C4A612F79566D69776E444D4F6B546555486A7854656E6250773D
+
+                string encryptionkey = SecurityHelper.GetEncryptionKey(stringSecureKey);
+                string saltstr = SecurityHelper.GetSaltBytesStr(stringSecureKey);
+                com.winters.securityhelper.SecurityHelper.EncryptionKey = encryptionkey;
+                com.winters.securityhelper.SecurityHelper.Salt = saltstr;
+
+
+                //Initialize security validation
+                if (com.winters.securityhelper.SecurityHelper.Init())
+                 {
+                    string decryptByCombinedKeySalt = SecurityHelper.DecryptByCombinedKeySalt(stringToDecrypt, stringSecureKey);
+
+                    Console.WriteLine();
+                    Console.WriteLine($"Password: {decryptByCombinedKeySalt}");
                     Console.WriteLine($"Secret Key: {SecurityHelper.EncryptionKey}");
                     Console.WriteLine($"Secure Key: {SecurityHelper.GetCombinedKeySalt()}");
                     Console.WriteLine();
 
                 } //End of SecurityHelper.Init()
-                else
-                {
-                    Console.WriteLine("Invalid salt! No null or whitespaces, invalid chars, or not multiples of 4 in length.");
-                }
-
 
                 return;
-            }
-            
+
+            } //End of decrypt
+
 
 
             //... More configs here.... 
@@ -589,19 +666,79 @@ namespace com.repeater.program
             return (operations);
         }
 
-        private static string[] ExtractUserPassword(string UsrColonPasswd)
+        private static string[] ExtractUserPassword(string usrNameEncrypted, string secureKey)
         {
             string[]? tmp;
 
-            //tmp = UsrColonPasswd.Split(":", StringSplitOptions.RemoveEmptyEntries).ElementAt(1);
-            tmp = UsrColonPasswd.Split(":", StringSplitOptions.RemoveEmptyEntries);
-            return (tmp);
+            if (string.IsNullOrEmpty(usrNameEncrypted) || string.IsNullOrEmpty(secureKey))
+                return (null);
 
+            //Decrypt the string to get our credentials
+            string usrColonPasswd = GetCredentialsFromSecret(usrNameEncrypted, secureKey);
+            tmp = usrColonPasswd.Split(":", StringSplitOptions.RemoveEmptyEntries);
+
+            //What went ~wrong~ _happened_? if empty or just a single item returned, decryption failed.
+            if ((tmp.Length == 01) || (tmp.Length == 1) )
+                return (null);
+
+            return (tmp);
+        }
+
+        /// <summary>
+        /// This is a helper fnction for ExtractUserPassword
+        /// </summary>
+        /// <param name="secret">string to the encrypted secret. Should follow the format of username:password</param>
+        /// <param name="securekey">string to the secret secure key to help unlock the encryption</param>
+        private static string GetCredentialsFromSecret (string secret, string securekey)
+        {
+
+            if (!string.IsNullOrEmpty(secret) || !string.IsNullOrEmpty(securekey))
+            {
+                //Steps:
+                //1- You HAVE the encrypted text
+                //2- you HAVE the secure key
+                //3- Break apart secure key.
+                //4- Get the ENCRYPTION KEY
+                string encryptionkey = SecurityHelper.GetEncryptionKey(securekey);
+                //5- Get the SALT KEY
+                //Gets the secure key and displays it as a string
+                string saltstr = SecurityHelper.GetSaltBytesStr(securekey);
+                //6- Setup the SecurityHelper class.
+                //Set up encryption key (password) and secure key (salt)
+                com.winters.securityhelper.SecurityHelper.EncryptionKey = encryptionkey;
+                com.winters.securityhelper.SecurityHelper.Salt = saltstr;
+
+
+                //Initialize security validation
+                if (com.winters.securityhelper.SecurityHelper.Init())
+                {
+                    string decryptByCombinedKeySalt = SecurityHelper.DecryptByCombinedKeySalt(secret, securekey);
+
+                    Console.WriteLine();
+                    Console.WriteLine($"Password: {decryptByCombinedKeySalt}");
+                    Console.WriteLine($"Secret Key: {SecurityHelper.EncryptionKey}");
+                    Console.WriteLine($"Secure Key: {SecurityHelper.GetCombinedKeySalt()}");
+                    Console.WriteLine();
+                    return (decryptByCombinedKeySalt);
+
+                } //End of SecurityHelper.Init()
+                else
+                {
+                    Console.WriteLine("Invalid salt! No null or whitespaces, invalid chars, or not multiples of 4 in length.");
+                    return (null);
+                }
+
+            }
+
+
+            return (null);
         }
 
         //This function will enable user to attach to a server and run commands until user disconnects.
         // The shell works, but we need to re-do PrcessCommands. This has all been tested but commands need to detect OS and all that
         // 1-7-2024 cw
+        //This is called by CLI -cmd attach server {ServerID}. If you need the main func, examine StartSvrWorkByID()
+        //TODO: Merge StartSvrWorkByID() and this func if possible.
         public static void AttachSvrByID(string serverID = "@all")
         {
             bool bComplete = false;
@@ -676,7 +813,7 @@ namespace com.repeater.program
                         case 0:
                             //System.Console.WriteLine("If user/password are both empty then use default user password\n");
                             bUseDefaultUserPassword = true;
-                            UserCredential = ExtractUserPassword(oConfigs.oConfigOptions.AppConfig.DefaultUserPassword);
+                            UserCredential = ExtractUserPassword(oConfigs.oConfigOptions.AppConfig.DefaultUserPassword, oConfigs.oConfigOptions.AppConfig.SecureKey);
                             break;
                         case 1:
                             //System.Console.WriteLine("Both user/password are configured, don't use default\n");
@@ -705,6 +842,7 @@ namespace com.repeater.program
                     System.Console.WriteLine("Server ID  : {0}", ServerItem.ID);
                     System.Console.WriteLine("Server Name: {0}", ServerItem.Name);
                     System.Console.WriteLine("Server IP  : {0}", ServerItem.IPAddress);
+                    
                     if (ServerItem.Port != null)
                         System.Console.WriteLine("Server Port: {0}", ServerItem.Port);
                     else
@@ -724,14 +862,13 @@ namespace com.repeater.program
 
                     if ((ServerItem.User == null) && (ServerItem.Password == null))
                     {
-                        System.Console.WriteLine("User       : {0} *default", UserCredential[0]);
-                        System.Console.WriteLine("Password   : {0} *default", UserCredential[1]);
-
+                        System.Console.WriteLine("User       : {0} *default", oConfigs.HideSecretDisplay(UserCredential[0]));
+                        System.Console.WriteLine("Password   : {0} *default", oConfigs.HideSecretDisplay(UserCredential[1]));
                     }
                     else
                     {
-                        System.Console.WriteLine("User       : {0}", ServerItem.User);
-                        System.Console.WriteLine("Password   : {0}", ServerItem.Password);
+                        System.Console.WriteLine("User       : {0}", oConfigs.HideSecretDisplay(ServerItem.User));
+                        System.Console.WriteLine("Password   : {0}", oConfigs.HideSecretDisplay(ServerItem.Password));
                     }
                     //UserCredential
 
@@ -756,7 +893,6 @@ namespace com.repeater.program
                             }
                             else
                                 System.Console.WriteLine("Connecting to {0}:{1} as {2} using default user and password", sshconn.GetHost(), sshconn.GetPort(), sshconn.GetUser());
-
                         }
 
                         else
@@ -770,26 +906,12 @@ namespace com.repeater.program
                             else
                                 System.Console.WriteLine("Connecting to {0}:{1} as {2} using specific user and password.", sshconn.GetHost(), sshconn.GetPort(), sshconn.GetUser());
                         }
-
-
                     }
 
 
-                    //BELOW doa  infinite while loop and process commds. Exit will get you out!
-                    // break the functionality below getting out of loop foreach (Server ServerItem in oConfigs.oConfigOptions.Servers) since we've found our server.
-                    //When user types "exit" then exit gracefully.
-
-
-
-                    //////////////////////////////////
-                    /////////////////////////////////
-                    //////////////////////////////////
-                    /////////////////////////////////
-
-                    //////////////////////////////////
-                    /////////////////////////////////
-                    //////////////////////////////////
-                    /////////////////////////////////
+                    //BELOW do an infinite while loop and process commds. Exit will get you out!
+                    // break the functionality below getting out of loop foreach (Server ServerItem in oConfigs.oConfigOptions.Servers)
+                    // since we've found our server. When user types "exit" then exit gracefully.
 
                     //This works, needs improvemtn and somehow able to inject custom commands.
                     //quitting for now. Getting late. 1-5-24 cw
@@ -841,9 +963,6 @@ namespace com.repeater.program
                     //{
                     //    ;
                     //}
-
-
-
 
 
                     string CmdItem = string.Empty;
@@ -903,7 +1022,6 @@ namespace com.repeater.program
                                     break;
                                 }
 
-
                                 System.Console.WriteLine("\tUploading: {0} {1}", sshconn.FilePathSepClean(sLocalRemoteFile[0]), sshconn.FilePathSepClean(sLocalRemoteFile[1]));
 
                                 if (!bDryRun)
@@ -916,7 +1034,6 @@ namespace com.repeater.program
                                     {
 
                                     }
-
                                 }
 
                                 break;
@@ -991,7 +1108,6 @@ namespace com.repeater.program
                         }
 
 
-
                         //Delay 
                         if ((ServerItem.Delay != string.Empty) || (ServerItem.Delay != null))
                         {
@@ -1002,8 +1118,6 @@ namespace com.repeater.program
                             }
                         }
 
-
-
                     } while (!CmdItem.Equals("exit", StringComparison.OrdinalIgnoreCase));
 
 
@@ -1012,20 +1126,13 @@ namespace com.repeater.program
                     //    if (ServerItem.Reboot.ToLower() == "true")
                     //        System.Console.WriteLine("Rebooting Server ID  : {0} [{1}]\n", ServerItem.ID, ServerItem.Name);
                     //}
-
-
                     
                     shellStreamSSH.Close();
-
-
                 } //End if server id check
-
             } //End of while not bComplete loop...
-
 
             if (sshconn.IsAllConnected)
                 sshconn.Disconnect();
-
         }
 
 
@@ -1033,11 +1140,10 @@ namespace com.repeater.program
         //This function is the main work horse to process through servers and enable automation from the config files.
         public static void StartSvrWorkByID(string serverID="@all")
         {
-
-            //First thing, first: are therer any servers to process?
+            //First thing, first: any servers to process?
             if (serverID == "")
             {
-                System.Console.WriteLine("No servers to process.");
+                System.Console.WriteLine("No server resources to process.");
                 return;
             }
 
@@ -1061,7 +1167,6 @@ namespace com.repeater.program
 
             //Set up ssh, scp, and ftp clients
             SSHConn sshconn = new SSHConn();
-
 
             //oConfigs
             System.Console.WriteLine("----------------------Repeater Version {0}---------------------", APP_VERSION);
@@ -1117,7 +1222,7 @@ namespace com.repeater.program
                         case 0:
                             //System.Console.WriteLine("If user/password are both empty then use default user password\n");
                             bUseDefaultUserPassword = true;
-                            UserCredential = ExtractUserPassword(oConfigs.oConfigOptions.AppConfig.DefaultUserPassword);
+                            UserCredential = ExtractUserPassword(oConfigs.oConfigOptions.AppConfig.DefaultUserPassword, oConfigs.oConfigOptions.AppConfig.SecureKey);
                             break;
                         case 1:
                             //System.Console.WriteLine("Both user/password are configured, don't use default\n");
@@ -1132,6 +1237,12 @@ namespace com.repeater.program
                             bUseDefaultUserPassword = true;
                             break;
 
+                    }
+
+                    if (UserCredential.Length==0 || UserCredential.Length==1)
+                    {
+                     System.Console.WriteLine("*** SERVER CONFIG ERROR! **** You need to either configure a global credential or include it into individual server configuration.");
+                     return;
                     }
 
                     if ( (!string.IsNullOrEmpty(ServerItem.NoRepeat)) && (ServerItem.NoRepeat.ToLower() == "true") )
@@ -1165,14 +1276,14 @@ namespace com.repeater.program
 
                     if ( (ServerItem.User ==null) && (ServerItem.Password==null) )
                     {
-                        System.Console.WriteLine("User       : {0} *default", UserCredential[0]);
-                        System.Console.WriteLine("Password   : {0} *default", UserCredential[1]);
+                        System.Console.WriteLine("User       : {0} *default", oConfigs.HideSecretDisplay(UserCredential[0]));
+                        System.Console.WriteLine("Password   : {0} *default", oConfigs.HideSecretDisplay(UserCredential[1]));
 
                     }
                     else
                     {
-                        System.Console.WriteLine("User       : {0}", ServerItem.User);
-                        System.Console.WriteLine("Password   : {0}", ServerItem.Password);
+                        System.Console.WriteLine("User       : {0}", oConfigs.HideSecretDisplay(ServerItem.User));
+                        System.Console.WriteLine("Password   : {0}", oConfigs.HideSecretDisplay(ServerItem.Password));
                     }
                     //UserCredential
 
@@ -1446,7 +1557,7 @@ namespace com.repeater.program
             if (sshconn.IsAllConnected)
                 sshconn.Disconnect();   
 
-        }        //End of StartSvrWorkByID()
+        } //End of StartSvrWorkByID()
 
 
         /// <summary>
