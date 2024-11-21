@@ -4,10 +4,16 @@
 * 20 - Oct - 2024
 *
 * Purpose
-* Security Helper for credentials store in Repeater. 
+* Security Helper for credential store in Repeater. 
 * 
 * Remember: If it doesn't work, I didn't write it.
-*/
+* TODO:
+* - ADD more logging! Had a few problems with decrypting. 
+*   More data is needed than debugging
+* - Merge this copy with Cat's Claw repo
+* - Improve Helper functions and complete TODOs in funcs
+* - Clean code
+ */
 using System;
 using System.Security.Cryptography;
 using System.Text;
@@ -28,13 +34,46 @@ namespace com.winters.securityhelper
         private static ISecurityHelperLogger? _logger;
 
         // Property to set the logger - internal or external
+        /*
+         
+            // Set up a custom logger to a file
+            SecurityHelper.Logger = new SecurityHelper.CustomLogger(logToFile: true, filePath: "logs.txt", appendToFile: true);
+
+            // External logging
+            SecurityHelper.Logger?.LogInfo("Application started.");
+
+            // Example internal logging
+            SecurityHelper.Logger?.LogInfo($"validation result: {isValid}");
+
+            // Another log entry
+            SecurityHelper.Logger?.LogInfo("Application finished.");  
+        
+            //Setup "applog.txt" as a file to log to - and no logging to console...
+            SecurityHelper.Logger = new SecurityHelper.CustomLogger(logToFile: true, filePath: "applog.log", appendToFile: true);
+            SecurityHelper.Logger?.LogInfo("APPL Repeater Version " + APP_VERSION + " - by C. Winters");
+
+            //Set up a console based log, no writing to file.
+            SecurityHelper.CustomLogger appLogger = new SecurityHelper.CustomLogger();
+            SecurityHelper.Logger = appLogger;
+            appLogger?.LogInfo("Repeater Version " + APP_VERSION + " - by C. Winters");
+
+            //Setup "security.log" as a file to log to and no logging to console.
+            SecurityHelper.CustomLogger securityLogger = new SecurityHelper.CustomLogger( logToFile: true, filePath: "security.log", appendToFile: true);
+            SecurityHelper.Logger = securityLogger;
+            securityLogger?.LogInfo("Repeater Version " + APP_VERSION + " - by C. Winters");
+         
+         */
         public static ISecurityHelperLogger? Logger
         {
             get => _logger;
             set => _logger = value;
         }
-        //Initing the class:
-        //SecurityHelper.Logger = new CustomLogger();
+
+        //Logger static property so we can init directly for other parts in prg. 
+        //public static ISecurityHelperLogger? Logger
+        //{
+        //    get; set;
+        //} = new SecurityHelper.SecurityLogger();
 
         //Internal info to keep track of the encryption key and salt. 
         [EditorBrowsable(EditorBrowsableState.Never)]
@@ -311,6 +350,8 @@ namespace com.winters.securityhelper
                         }
                         catch (System.Security.Cryptography.CryptographicException)
                         {
+                            //System.Security.Cryptography.CryptographicException: 'Padding is invalid and cannot be removed.'
+
                             return ("Error: Decryption failed.");
                         }
                     }
@@ -443,7 +484,7 @@ namespace com.winters.securityhelper
 
             //todo: cleaner way:
             //byte[] byteArray = Encoding.UTF8.GetBytes(input);
-            //return BitConverter.ToString(byteArray).Replace("-", "");
+            //return (BitConverter.ToString(byteArray).Replace("-", ""));
         }
 
 
@@ -474,7 +515,7 @@ namespace com.winters.securityhelper
                 CombinedKeySalt = ConvertStringToHex(encryptionKey + ":" + Convert.ToBase64String(saltBytes));
 
             _manualOverride = false;
-            //return $"{encryptionKey}:{Convert.ToBase64String(saltBytes)}";
+            //return ($"{encryptionKey}:{Convert.ToBase64String(saltBytes)}");
         }
 
         /// <summary>
@@ -611,7 +652,7 @@ namespace com.winters.securityhelper
                 return (false);
             }
 
-            Logger?.LogInfo("Init validated");
+            Logger?.LogInfo("Doing action: ValidateSalt(). Init validated!");
             return (true);  
         }
 
@@ -674,33 +715,49 @@ namespace com.winters.securityhelper
         }
 
 
-        // / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / 
-        //Example "external" logging to capture logging in SecurityHelper class
-        // / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / 
         public class CustomLogger : ISecurityHelperLogger
         {
-            //Log errors....
+            private readonly bool _logToFile;
+            private readonly string? _filePath;
+            private readonly bool _appendToFile;
+
+            public CustomLogger(bool logToFile = false, string? filePath = null, bool appendToFile = true)
+            {
+                _logToFile = logToFile;
+                _filePath = filePath;
+                _appendToFile = appendToFile;
+
+                if (_logToFile && !string.IsNullOrWhiteSpace(_filePath) && !_appendToFile)
+                    System.IO.File.WriteAllText(_filePath, string.Empty); 
+            }
+
             public void LogError(string message)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ERROR] {DateTime.Now}: {message}");
-                Console.ResetColor();
+                Log(message, "ERROR", ConsoleColor.Red);
             }
 
-            // Log warnings...
             public void LogWarning(string message)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[WARNING] {DateTime.Now}: {message}");
-                Console.ResetColor();
+                Log(message, "WARNING", ConsoleColor.Yellow);
             }
 
-            // Log informational...
             public void LogInfo(string message)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[INFO] {DateTime.Now}: {message}");
-                Console.ResetColor();
+                Log(message, "INFO", ConsoleColor.Green);
+            }
+
+            private void Log(string message, string level, ConsoleColor color)
+            {
+                string formattedMessage = $"[{level}] {DateTime.Now}: {message}";
+
+                if (_logToFile && !string.IsNullOrWhiteSpace(_filePath))
+                    System.IO.File.AppendAllText(_filePath, formattedMessage + Environment.NewLine);
+                else
+                {
+                    Console.ForegroundColor = color;
+                    Console.WriteLine(formattedMessage);
+                    Console.ResetColor();
+                }
             }
         }
 

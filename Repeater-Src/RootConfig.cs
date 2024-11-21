@@ -20,6 +20,8 @@ namespace com.winters.config
         public string DefaultPassword { get; set; }
         public string DefaultUserPassword { get; set; }
 
+        public string SecureKey { get; set; }
+
         public string DefaultPort { get; set; }
 
         public string DryRun { get; set; }
@@ -221,6 +223,7 @@ namespace com.winters.config
             }
 
             System.Console.WriteLine("DefaultUserPasswd     : {0}", HideSecretDisplay(oConfigOptions.AppConfig.DefaultUserPassword));
+            System.Console.WriteLine("SecureKey             : {0}", oConfigOptions.AppConfig.SecureKey);
             System.Console.WriteLine("Default Port          : {0}", oConfigOptions.AppConfig.DefaultPort );
             System.Console.WriteLine("DryRun                : {0}", oConfigOptions.AppConfig.DryRun);
 
@@ -237,8 +240,8 @@ namespace com.winters.config
                 System.Console.WriteLine("Server Name: {0}", ServerItem.Name);
                 System.Console.WriteLine("Server IP  : {0}", ServerItem.IPAddress);
                 System.Console.WriteLine("Server Port: {0}", ServerItem.Port);
-                System.Console.WriteLine("User       : {0}", ServerItem.User);
-                System.Console.WriteLine("Password   : {0}", ServerItem.Password);
+                System.Console.WriteLine("User       : {0}", HideSecretDisplay(ServerItem.User));
+                System.Console.WriteLine("Password   : {0}", HideSecretDisplay(ServerItem.Password));
 
                 System.Console.WriteLine("Commands:");
 
@@ -289,7 +292,8 @@ namespace com.winters.config
         // Short secret:
         // Input: "abc"
         // Output: "***"
-
+        // Note: I'm sort of torn keeping this function because it doesn't have anything to do with configs, mostly data hiding.
+        // I think I'll move this later to a utility area.
         public string HideSecretDisplay(string secret)
         {
             if (string.IsNullOrEmpty(secret))
@@ -311,7 +315,6 @@ namespace com.winters.config
                 //REmix and return
                 return (maskedBeforeColon + ":" + maskedAfterColon);
             }
-
             // No ':' found? Mask the whole thing, return
             return (MaskString(secret, 4));
         }
@@ -333,7 +336,6 @@ namespace com.winters.config
             int hiddenChars = input.Length - visibleChars;
             return new string('*', hiddenChars) + input.Substring(hiddenChars);
         }
-
 
     }
 }
