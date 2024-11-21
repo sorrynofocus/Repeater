@@ -1,5 +1,14 @@
 ﻿This is a MARKDOWN file.
 
+```
+NOTES:
+Data is in name/value pairs
+Data is separated by commas
+Curly braces hold objects
+Square brackets hold arrays
+JSON intro: https://www.w3schools.com/js/js_json_intro.asp
+``` 
+
 July 21 2021
 
 Most of the work has been configuration and processing configuration. As of this date, conmfiguration is parsing correct. The final config format will 
@@ -72,7 +81,7 @@ each server. If all the servers do the same, the global files can be used to pro
 TODO: pass in --createconfig to create template
 
 04/25/2022
-Tested on MAc, Widnows , and linux machine.
+Tested on MAc, Windows, and linux machine.
 FAilure trying to copy from a mapped drive to a local. We forget that SSH does not have access to drives because we are logged into another workstation. 
 So, we get
 Unhandled exception. Renci.SshNet.Common.ScpException: scp: Z:/test/sdksetup.exe: No such file or directory
@@ -157,3 +166,39 @@ Doesn't work in commands file:
 Does work in commands file:
 @upload C:/temp/TestSSH-Tool/getproductkey.ps1 c:/temp/getproductkey.ps1
 
+1-8-2024
+It's been a long time!
+What's new?
+ - New function AttachSvrByID() where you can attach to a server in the config via basic SSH. You can list directories, examine files, run 
+   basic Os commands. Editing files is a bit of a challenge, but this is not as important as just getting basic ssh working. This took some 
+   time to get working. The function si not finished as it needs commands revamping. And...
+ - I've discovered why sometimes the isWindows, isLinux, or isMac() are not working. This is because we're detecting OS by interoperable 
+   means. The correct functions that work as a remote detection are the functions in sshconn-help.cs-- see DetectOS(). We may need to move
+   these commands over into the CommandUtils.cs and rename the ones that use interoperable 
+ - Added new command line arg: -cmd attach server {ServerID} this is the activate the ssh shell as described above. Currently, you can use 
+   server ID to connect to. For credentials, you can use the ones from config. Using a server IP alone is not supported. It's best to add 
+   it to the config.
+ TODOs:
+ - encrypt/decrypt password
+ - Add SSH key authentication
+ - AttachSvrByID() -finish it.
+ - Clean up code
+ - Some command line args functionality are missing. Example: "--configme"
+ - Go over older bugs.
+
+10-8-2024
+It's been a long time -again!
+- Fixed a bug where if dry run and loading global run files (linux/windows) will produce unhandeld exception.
+   Unhandled exception. System.ArgumentNullException: Value cannot be null. (Parameter 'collection')
+   at System.Collections.Generic.List`1..ctor(IEnumerable`1 collection)
+   at com.repeater.program.RepeaterPrg.StartSvrWorkByID(String serverID)
+   at com.repeater.program.RepeaterPrg.Main(String[] args)
+- Changing a few strings displaying status
+
+11-18-2024
+- Added security credential helper. Modified RootConfig to help mask sensitive data. This was pretty huge and only prelimaries
+  have been added. See command line option "encrypt". This is where I've started using the library (See catsclasw security in 
+- repo... and _that_ needs updating with this one! Found bugs!)
+- Updated command line processer.
+- Fixed a couple bugs.
+- Added constants for string table. THe need to move strings to a table for later localization translation.

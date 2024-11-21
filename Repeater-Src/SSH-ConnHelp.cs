@@ -4,6 +4,12 @@ using System.Linq;
 using System.Text;
 using Renci.SshNet;
 using System.Threading.Tasks;
+using com.winters.commandutils;
+using System.IO;
+using System.Threading;
+using Renci.SshNet.Common;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 //TODO: break up the scp, ftp, and ssh clients.
 
@@ -40,6 +46,8 @@ namespace com.winters.sshconnhlp
         //Run SSH command -async
         private static SshCommand sshComd = null;
 
+        private static ShellStream shellStreamSSH = null;
+
         //FTP client if we need to upload files
         SftpClient ftpClient = null;
 
@@ -66,6 +74,8 @@ namespace com.winters.sshconnhlp
               );
 
             ConnNfo.Encoding = Encoding.UTF8;
+
+            //sshClient.ConnectionInfo.Timeout = TimeSpan.FromSeconds(120);
 
             sshClient = new SshClient(ConnNfo);
 
@@ -100,7 +110,13 @@ namespace com.winters.sshconnhlp
         public string GetPort() => sshClient.ConnectionInfo.Port.ToString();
         public string GetClientVersion() => sshClient.ConnectionInfo.ClientVersion.ToString();
 
-        public string GetUser() => sshClient.ConnectionInfo.Username.Trim();    
+        public string GetUser() => sshClient.ConnectionInfo.Username.Trim();
+
+        public SshClient GetConn => sshClient;
+
+
+
+
 
 
         public string HandleException(Exception prgException)
@@ -390,6 +406,33 @@ namespace com.winters.sshconnhlp
             return sshClient.CreateCommand(command).Execute();
         }
 
+        /// <summary>
+        /// Runs a command  -non async, non-static 
+        /// NON-PROD: prototype function!
+        /// </summary>
+        /// <param name="sshClient"></param>
+        /// <param name="command"></param>
+        /// <returns></returns>
+        public String ExecuteCmd(String command)
+        {
+            if (sshClient == null) return (null);
+
+            if (!sshClient.IsConnected)
+                sshClient.Connect();
+
+            //var cmd = sshClient.CreateCommand(command).Execute();
+            SshCommand cmd = sshClient.CreateCommand(command);
+            string result = cmd.Execute();
+            if ( (result != null) && (result.Length >0) )
+            {
+                result = result.Substring(0, result.Length - 1);
+                return (result);
+            }
+            
+            return (null);
+        }
+
+
         public Dictionary<int, string> ExecuteCommandEx(String command)
         {
             if (sshClient == null) return (null);
@@ -401,6 +444,8 @@ namespace com.winters.sshconnhlp
 
             return (Results);
         }
+
+
 
         /// <summary>
         /// Downloads a file from a remote system to the local system.
@@ -523,6 +568,58 @@ namespace com.winters.sshconnhlp
             else
                 return false;
         }
+
+
+        //This helped
+        // https://stackoverflow.com/questions/61158899/display-complete-ssh-shell-output-including-login-message-and-prompt-in-c-sharp
+        public ShellStream CreateShell2()
+        {
+            ShellStream shellStreamSSH = sshClient.CreateShellStream("vt-100", 80, 60, 800, 600, 65536);
+            return (shellStreamSSH);
+        }
+
+
+        // Volatile is used as hint to the compiler that this data
+        // member will be accessed by multiple threads.
+        private volatile bool bStop =false;
+
+        public void ShellThreadStop()
+        {
+            bStop = true;
+        }
+
+        public  void recvSSHData(ShellStream shellStreamSSH)
+        {
+            while (!bStop)
+            {
+                try
+                {
+                    if (shellStreamSSH != null && shellStreamSSH.DataAvailable)
+                    {
+                        string strData = shellStreamSSH.Read();
+
+                        Console.WriteLine(strData);
+                    }
+                    else
+                    {
+                        ;
+                    }
+                }
+                catch
+                {
+
+                }
+
+                System.Threading.Thread.Sleep(200);
+            }
+        }
+
+
+
+
+
+
+
 
 
         //

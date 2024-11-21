@@ -1,5 +1,21 @@
-﻿
-using Renci.SshNet;
+﻿/*
+* C.Winters / US / Arizona / Thinkpad T15g 
+*
+* Purpose:
+* Repeater is a tool that uses SSH comms to run tasks or automation on virtual or static machine nodes. 
+* Repeater can be configured for individual or global credentials to log into a system. The configuration 
+* is in JSON format and a dry-run test can be used to test out output.
+* 
+* My current usage is - I have two machines. Instead of remote desktop, I can call Repeater to display
+* current information on the systems, send an event log to the server reporting I am no longer using it, 
+* and shuts them both down after writing the event log. There are many other uses. 
+*
+* I realise Ansible is a product out there you can use. But, when I started writing this, I was aware, 
+* but never used it. So, I wrote my own. I may revamp this to follow the "playbook" technique, 
+* because the Global commands file isn't the best solution as "playbooks" are. 
+* 
+* This project is currently under development. See "APP_VERSION" string in this file for release version.
+*/
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,17 +24,10 @@ using System.Text;
 using com.winters.config;
 using com.winters.sshconnhlp;
 using com.winters.commandutils;
-
-
-
-//NOTES:
-/*
-Data is in name/value pairs
-Data is separated by commas
-Curly braces hold objects
-Square brackets hold arrays
-JSON intro: https://www.w3schools.com/js/js_json_intro.asp
- */
+using Renci.SshNet;
+using Renci.SshNet.Common;
+using com.winters.securityhelper;
+using Repeater;
 
 namespace com.repeater.program
 {
@@ -26,7 +35,7 @@ namespace com.repeater.program
     {
 
         public static string configFile = ".\\config.json";
-        public static readonly string APP_VERSION = "alpha-1.2.3";
+        public static readonly string APP_VERSION = "alpha-1.2.6";
 
         //Set up ssh, scp, and ftp clients
         public static SSHConn sshconn = new SSHConn();
@@ -65,27 +74,50 @@ namespace com.repeater.program
             //Command line arguments. Supports example params like /param {choice}, -param {choice}, and --param {choice}
             string[] sPrgArgs = Environment.GetCommandLineArgs();
 
-            string s1;
+            // Dictionary to store parsed arguments
+            Dictionary<string, string> dictArgs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            Dictionary<string, string> dictArgs = new Dictionary<string, string>();
-
-            for (int iIndex = 1; iIndex < sPrgArgs.Length; iIndex += 2)
+            for (int iIndex = 1; iIndex < sPrgArgs.Length; iIndex++)
             {
-                string sIndexArg = sPrgArgs[iIndex].Replace("/", "").Replace("-", "").Replace("--", "");
+                string currentArg = sPrgArgs[iIndex];
 
-                try
+                // Handle switches and parameters like -cmd, --cmd
+                if (currentArg.StartsWith("/") || currentArg.StartsWith("-"))
                 {
-                    if (sPrgArgs[iIndex].Length > 1)
-                        s1 = sPrgArgs[iIndex + 1];
+                    string key = currentArg.TrimStart('/', '-', '-');
 
-                    dictArgs.Add(sIndexArg, sPrgArgs[iIndex + 1]);
+                    // Check if the next argument is a value or another switch
+                    string value = (iIndex + 1 < sPrgArgs.Length && !sPrgArgs[iIndex + 1].StartsWith("/") && !sPrgArgs[iIndex + 1].StartsWith("-"))
+                                   ? sPrgArgs[++iIndex]
+                                   : string.Empty;
+
+                    if (!dictArgs.ContainsKey(key))
+                        dictArgs.Add(key, value);
                 }
-                catch
+                else if (currentArg.Contains("=")) // Handle sub-command arguments like "password=ThisIsMyPassword"
                 {
-                    //Trying to add the same key - won't work.
-                    dictArgs.Add(sIndexArg, "");
-                }
+                    string[] keyValue = currentArg.Split('=');
 
+                    if (keyValue.Length == 2)
+                    {
+                        string key = keyValue[0].Trim();
+                        string value = keyValue[1].Trim();
+
+                        if (!dictArgs.ContainsKey(key))
+                            dictArgs.Add(key, value);
+                    }
+                }
+                else // Handle cases where parameter value follows the key directly (e.g., password ThisIsMyPassword)
+                {
+                    string key = currentArg.Trim();
+
+                    // Ensure we have a value after the key
+                    if (iIndex + 1 < sPrgArgs.Length && !sPrgArgs[iIndex + 1].StartsWith("/") && !sPrgArgs[iIndex + 1].StartsWith("-"))
+                    {
+                        string value = sPrgArgs[++iIndex].Trim();
+                        dictArgs.Add(key, value);
+                    }
+                }
             }
 
             //Override configuration file switch
@@ -94,10 +126,71 @@ namespace com.repeater.program
                 //Override the config file
                 configFile = dictArgs["config"];
 
+
+            if (dictArgs.ContainsKey("version"))
+            {
+                System.Console.WriteLine("Repeater Version {0} - by C. Winters", APP_VERSION);
+                Environment.Exit(0);
+            }
+
             //configme switch
             //If you don't have a config file and want to start your own... 
+            // example-config.json is created in same directory with a few samples.
             if (dictArgs.ContainsKey("configme"))
             {
+                
+                string GetcurPathExe = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string ConfigPath = GetcurPathExe + "\\example-config.json";
+
+                if (GetcurPathExe.Contains("/"))
+                {
+                    //We're on unix type system, modify path
+                    ConfigPath = "/" + ConfigPath.Replace("\\", "/");
+                }
+
+                oConfigs.ConfigFile = ConfigPath;
+
+                oConfigs.oConfigOptions.AppConfig = new AppConfig();
+
+
+                oConfigs.oConfigOptions.AppConfig.DryRun = "true";
+                oConfigs.oConfigOptions.AppConfig.DefaultPort = "20";
+                oConfigs.oConfigOptions.Servers = new List<Server>
+                {
+                    new Server()
+                    {
+                        Name = "Server2",
+
+                        ID = "ServerID2",
+                        IPAddress = "192.168.1.2",
+                        Cmds = new List<string>
+                        {
+                            "@sysinfo",
+                            "help"
+                        },
+                        Delay ="100",
+                        Reboot = "false"
+                    },
+                    new Server()
+                    {
+                        Name = "Server3",
+                        ID = "ServerID3",
+                        IPAddress = "192.168.1.3",
+                        Cmds = new List<string>
+                        {
+                            "@sysinfo",
+                            "help"
+                        },
+                        Delay ="100",
+                        Reboot = "false"
+                    }
+                };
+
+                //Since we've built up our configuration _manually_, we m,ust set the config loaded flag to save.
+                oConfigs.oConfigOptions.ConfigLoaded = true;    
+                oConfigs.SaveConfig();
+                System.Console.WriteLine("Example config saved: " + oConfigs.ConfigFile );
+                Environment.Exit(0);
             }
 
             //nolog switch
@@ -113,7 +206,6 @@ namespace com.repeater.program
                 oConfigs.ConfigFile = configFile;
                 oConfigs.ReadConfigJSON();
                 oConfigs.DisplayConfig();
-
                 return;
             }
 
@@ -143,12 +235,18 @@ namespace com.repeater.program
                     oConfigs.ConfigFile = configFile;
                     if (oConfigs.ReadConfigJSON() != 0)
                     {
-                        System.Console.WriteLine("Well shit. Config is bad. Check for duplicate server IDs if the config file exist.");
+                        System.Console.WriteLine("Invalid config file. Check for duplicate server IDs if the config file exist.");
                     }
 
                     string sDefaultUser = string.Empty;
 
-                    string serverID = dictArgs["server"];
+                    string serverID = dictArgs.ContainsKey("server") ? dictArgs["server"].Trim() : string.Empty;
+                    
+                    if (string.IsNullOrWhiteSpace(serverID))
+                    {
+                        Console.WriteLine("Server ID is missing or invalid.");
+                        return;
+                    }
 
                     StartSvrWorkByID(serverID);
 
@@ -162,6 +260,36 @@ namespace com.repeater.program
             }
 
 
+            //cmd args: -cmd attach server {ServerID}
+            // Example: -cmd attach server Lev001
+            if (dictArgs.ContainsKey("cmd") && dictArgs.ContainsValue("attach"))
+            {
+                try
+                {
+                    oConfigs.ConfigFile = configFile;
+                    if (oConfigs.ReadConfigJSON() != 0)
+                    {
+                        System.Console.WriteLine("Well shit. Config is bad. Check for duplicate server IDs if the config file exist.");
+                    }
+
+                    string sDefaultUser = string.Empty;
+
+                    string serverID = dictArgs["server"].Trim();
+
+                    //StartSvrWorkByID(serverID);
+                    AttachSvrByID(serverID);
+
+                }
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine("Command line parameters invalid.");
+                }
+                return;
+
+            }
+
+
+
             //Override log file usage switch
             // /log c:\files_processed.log
             // If you want to use your own log file, use this switch.
@@ -172,14 +300,102 @@ namespace com.repeater.program
 
             }
 
-            //encrypt a password to use as update credentials
-            // -encrypt mypassword
-            if (dictArgs.ContainsKey("encrypt"))
-            {
-                //                string sEncryptPasswd = string.Empty;
 
-                //                return;
+
+
+
+
+            //if (dictArgs.TryGetValue("cmd", out var command) && command.Equals("encrypt", StringComparison.OrdinalIgnoreCase))
+            //{
+            //    Console.WriteLine("Encrypt command detected!");
+
+            //    if (dictArgs.TryGetValue("password", out var password))
+            //    {
+            //        Console.WriteLine($"Password: {password}");
+            //    }
+
+            //    if (dictArgs.TryGetValue("key", out var key))
+            //    {
+            //        Console.WriteLine($"Key: {key}");
+            //    }
+            //}
+
+
+
+
+
+
+
+
+            //encrypt a password to use as update credentials
+            // Two examples to use:
+            // -cmd encrypt password=MyPassword key=123456789ABC
+            // -cmd encrypt password ThisIsMyPassword Key 123456789AB
+            
+            //if ( dictArgs.ContainsKey("cmd") && 
+            //     dictArgs.ContainsValue("encrypt") 
+            //   )
+            if (dictArgs.TryGetValue("cmd", out var command) && command.Equals("encrypt", StringComparison.OrdinalIgnoreCase))
+            {
+                
+                if (! (dictArgs.TryGetValue("password", out string stringToEncrypt)) ||
+                      !(dictArgs.TryGetValue("key", out string stringEncryptionKey))
+                   )
+                {
+                    System.Console.WriteLine(StringTable.errInvalidCmdEncrypt);
+                    return;
+                }
+
+                if ( string.IsNullOrEmpty(stringToEncrypt) ||
+                     string.IsNullOrEmpty(stringEncryptionKey) 
+                    )
+                {
+                    System.Console.WriteLine(StringTable.setupEncrypt);
+                    stringToEncrypt = System.Console.ReadLine();
+
+                    stringEncryptionKey = System.Console.ReadLine();
+                    System.Console.WriteLine(StringTable.setupEnterEncryptionKey);
+                }
+
+
+                //Set up encryption key (password) and secure key (salt)
+                com.winters.securityhelper.SecurityHelper.EncryptionKey = stringEncryptionKey;
+                //com.winters.securityhelper.SecurityHelper.Salt = stringSalt;
+                
+                //Randomizer. 
+                //SecurityHelper.EncryptionKey = SecurityHelper.GenerateRandomString(32);
+                SecurityHelper.Salt = SecurityHelper.ConvertByteArrayToString(SecurityHelper.GenerateRandomBytes(32));
+
+                //Initialize security validation
+                if (com.winters.securityhelper.SecurityHelper.Init())
+                {
+
+                    //Encapsulation encrypt and decrypt
+                    string encryptedText = com.winters.securityhelper.SecurityHelper.Encrypt(stringToEncrypt);
+                    string decryptedText = com.winters.securityhelper.SecurityHelper.Decrypt(encryptedText);
+
+                    string uncombinedencryptionkey = SecurityHelper.GetEncryptionKey(SecurityHelper.GetCombinedKeySalt());
+                    string decryptByCombinedKeySalt = SecurityHelper.DecryptByCombinedKeySalt(encryptedText, SecurityHelper.GetCombinedKeySalt());
+
+                    Console.WriteLine();
+                    Console.WriteLine("Store these value soemwhere safe!");
+                    Console.WriteLine();
+                    Console.WriteLine("Use ONLY the SECURE KEY to decrypt password (or any encrypted text)");
+                    Console.WriteLine($"Password: {decryptedText}");
+                    Console.WriteLine($"Secret Key: {SecurityHelper.EncryptionKey}");
+                    Console.WriteLine($"Secure Key: {SecurityHelper.GetCombinedKeySalt()}");
+                    Console.WriteLine();
+
+                } //End of SecurityHelper.Init()
+                else
+                {
+                    Console.WriteLine("Invalid salt! No null or whitespaces, invalid chars, or not multiples of 4 in length.");
+                }
+
+
+                return;
             }
+            
 
 
             //... More configs here.... 
@@ -383,8 +599,438 @@ namespace com.repeater.program
 
         }
 
+        //This function will enable user to attach to a server and run commands until user disconnects.
+        // The shell works, but we need to re-do PrcessCommands. This has all been tested but commands need to detect OS and all that
+        // 1-7-2024 cw
+        public static void AttachSvrByID(string serverID = "@all")
+        {
+            bool bComplete = false;
+
+            if (string.IsNullOrEmpty(serverID))
+            {
+                System.Console.WriteLine("No servers to process.");
+                return;
+            }
+
+            if (oConfigs.oConfigOptions.AppConfig == null)
+            {
+                System.Console.WriteLine("Application configuration is not right. Check AppConfig section. Run with --createconfig to start a new template.");
+                return;
+            }
+
+            string[] UserCredential = null;
+            bool bDryRun = false;
+
+            if ((oConfigs.oConfigOptions.AppConfig.DryRun == "false") || (oConfigs.oConfigOptions.AppConfig.DryRun == ""))
+                bDryRun = false;
+            else
+                bDryRun = true;
+
+            //Load up the commands file into memory, if any.
+            CmdUtils.listGlobalLinuxCommands = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile);
+            CmdUtils.listGlobalWinCommands = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile);
+
+            //Set up ssh, scp, and ftp clients
+            SSHConn sshconn = new SSHConn();
 
 
+            //oConfigs
+            System.Console.WriteLine("----------------------Repeater Version {0}---------------------", APP_VERSION);
+            if (oConfigs.oConfigOptions.ConfigLoaded)
+                System.Console.WriteLine("Config file : " + oConfigs.ConfigFile);
+            else
+            {
+                System.Console.WriteLine("Config loaded : false");
+                Environment.Exit(-1);
+            }
+
+            //if (bDryRun)
+            //    System.Console.WriteLine("Dry Run : true");
+            //else
+            //    System.Console.WriteLine("Dry Run : false");
+
+            //System.Console.WriteLine("GlobalLinuxCommandFile: {0}", oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile);
+            //System.Console.WriteLine("GlobalWinCommandFile  : {0}", oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile);
+
+            //System.Console.WriteLine("Processing {0} servers...\n", oConfigs.oConfigOptions.Servers.Count);
+
+            //If we used --cmd attache server [serverid], let's look it up and use that
+            foreach (Server ServerItem in oConfigs.oConfigOptions.Servers)
+            {
+                if ((ServerItem.ID == serverID) || (serverID == "@all"))
+                {
+
+                    if ((ServerItem.Delay == null) || (ServerItem.Delay == null))
+                        ServerItem.Delay = "0";
+
+                    int doUseUserPasswordDefault = doesUseDefaultUserPassword(ServerItem.ID);
+                    bool bUseDefaultUserPassword = false;
+
+
+                    // doUseUserPasswordDefault
+                    //0 - If they are both empty or null then use default
+                    //1 - If either password or user contain anything, then return error reporting user or password is null
+                    //-1 -If both contain anything, then skip
+                    switch (doUseUserPasswordDefault)
+                    {
+                        case 0:
+                            //System.Console.WriteLine("If user/password are both empty then use default user password\n");
+                            bUseDefaultUserPassword = true;
+                            UserCredential = ExtractUserPassword(oConfigs.oConfigOptions.AppConfig.DefaultUserPassword);
+                            break;
+                        case 1:
+                            //System.Console.WriteLine("Both user/password are configured, don't use default\n");
+                            bUseDefaultUserPassword = false;
+                            break;
+                        case -1:
+                            //System.Console.WriteLine("If either contain anything and the other doesn't, then return error reporting user or password is null\n");
+                            bUseDefaultUserPassword = true;
+                            break;
+
+                        default:
+                            bUseDefaultUserPassword = true;
+                            break;
+
+                    }
+
+                    //if ((!string.IsNullOrEmpty(ServerItem.NoRepeat)) && (ServerItem.NoRepeat.ToLower() == "true"))
+                    //{
+                    //    System.Console.WriteLine("\n****************************************");
+                    //    System.Console.WriteLine("Skipping server {0} [{1}] due to NO REPEAT.", ServerItem.Name, ServerItem.ID);
+                    //    System.Console.WriteLine("****************************************");
+                    //    continue;
+                    //}
+
+                    System.Console.WriteLine("\n----------------------------------------------------------");
+                    System.Console.WriteLine("Server ID  : {0}", ServerItem.ID);
+                    System.Console.WriteLine("Server Name: {0}", ServerItem.Name);
+                    System.Console.WriteLine("Server IP  : {0}", ServerItem.IPAddress);
+                    if (ServerItem.Port != null)
+                        System.Console.WriteLine("Server Port: {0}", ServerItem.Port);
+                    else
+                    {
+                        if (oConfigs.oConfigOptions.AppConfig.DefaultPort != null)
+                        {
+                            ServerItem.Port = oConfigs.oConfigOptions.AppConfig.DefaultPort;
+                            System.Console.WriteLine("Server Port: {0} *default", oConfigs.oConfigOptions.AppConfig.DefaultPort);
+                        }
+                        else
+                        {
+                            System.Console.WriteLine("*** COMMS ERROR! **** You need to set the server's POrt configuration or define DefaultPort under the AppConfig section.");
+                            return;
+                        }
+                    }
+
+
+                    if ((ServerItem.User == null) && (ServerItem.Password == null))
+                    {
+                        System.Console.WriteLine("User       : {0} *default", UserCredential[0]);
+                        System.Console.WriteLine("Password   : {0} *default", UserCredential[1]);
+
+                    }
+                    else
+                    {
+                        System.Console.WriteLine("User       : {0}", ServerItem.User);
+                        System.Console.WriteLine("Password   : {0}", ServerItem.Password);
+                    }
+                    //UserCredential
+
+                    System.Console.WriteLine("Command delay: {0} seconds", ServerItem.Delay);
+                    System.Console.WriteLine("Task repeat   : {0}", ServerItem.NoRepeat);
+                    System.Console.WriteLine("Reboot after  : {0}", ServerItem.Reboot);
+                    System.Console.WriteLine("Frequency     : {0}\n", ServerItem.Frequency);
+
+
+                    System.Console.WriteLine("Attempting to connect to server: {0} [{1}]\n", ServerItem.Name, ServerItem.ID);
+
+                    if (!bDryRun)
+                    {
+                        //Use global default user:password credential
+                        if (bUseDefaultUserPassword)
+                        {
+
+                            if (!ConnectToServer(ServerItem.IPAddress, Int32.Parse(ServerItem.Port), UserCredential[0], UserCredential[1]))
+                            {
+                                System.Console.WriteLine("ERROR! Cannot connect to this server!\n");
+                                continue;
+                            }
+                            else
+                                System.Console.WriteLine("Connecting to {0}:{1} as {2} using default user and password", sshconn.GetHost(), sshconn.GetPort(), sshconn.GetUser());
+
+                        }
+
+                        else
+                        {
+                            //Use server user/password specifics
+                            if (!ConnectToServer(ServerItem.IPAddress, Int32.Parse(ServerItem.Port), ServerItem.User, ServerItem.Password))
+                            {
+                                System.Console.WriteLine("ERROR! Cannot connect to this server!\n");
+                                continue;
+                            }
+                            else
+                                System.Console.WriteLine("Connecting to {0}:{1} as {2} using specific user and password.", sshconn.GetHost(), sshconn.GetPort(), sshconn.GetUser());
+                        }
+
+
+                    }
+
+
+                    //BELOW doa  infinite while loop and process commds. Exit will get you out!
+                    // break the functionality below getting out of loop foreach (Server ServerItem in oConfigs.oConfigOptions.Servers) since we've found our server.
+                    //When user types "exit" then exit gracefully.
+
+
+
+                    //////////////////////////////////
+                    /////////////////////////////////
+                    //////////////////////////////////
+                    /////////////////////////////////
+
+                    //////////////////////////////////
+                    /////////////////////////////////
+                    //////////////////////////////////
+                    /////////////////////////////////
+
+                    //This works, needs improvemtn and somehow able to inject custom commands.
+                    //quitting for now. Getting late. 1-5-24 cw
+                    //ShellStream shellStreamSSH = sshconn.CreateShell2();
+
+                    SshClient cursshconn = sshconn.GetConn;
+                    string CmdItemCmd = string.Empty;
+                    string cmdResult = string.Empty;
+
+                    ShellStream shellStreamSSH = cursshconn.CreateShellStream("vt-100", 80, 60, 800, 600, 65536);
+
+                    //This works
+                    //ShellStream shellStreamSSH = sshconn.CreateShell2();
+
+                    StreamWriter writer = new StreamWriter(shellStreamSSH);
+
+                    // Read from SSH. Subscribe event to write out the data.
+                    shellStreamSSH.DataReceived += (object sender, ShellDataEventArgs e) =>
+                    {
+                        System.Console.Write(Encoding.UTF8.GetString(e.Data));
+                        //Emulation. For the oldies, raise up the sleep to make the system appear like a 56K modem!
+                        System.Threading.Thread.Sleep(50);
+                    };
+
+                    //do
+                    //    {
+                    //        CmdItemCmd = Console.ReadLine() ?? string.Empty;
+                    //        //shellStreamSSH.Write(CmdItemCmd + "\n");
+
+                    //        writer.AutoFlush = true;
+                    //        writer.Write(CmdItemCmd  + "\n" );
+
+                    //    } while (!CmdItemCmd.Equals("exit", StringComparison.OrdinalIgnoreCase));
+
+
+
+                    //Is linux, windows or macos?
+                    //if (sshconn.isWindows())
+                    //{
+                    //    ;
+                    //}
+
+                    //if (sshconn.isLinux())
+                    //{
+                    //    ;
+                    //}
+
+                    //if (sshconn.isMacOS())
+                    //{
+                    //    ;
+                    //}
+
+
+
+
+
+                    string CmdItem = string.Empty;
+                    do
+                    {
+                        CmdItem = Console.ReadLine() ?? string.Empty;
+                        //shellStreamSSH.Write(CmdItem + "\n");
+
+                        writer.AutoFlush = true;
+                        writer.Write(CmdItem + "\n");
+
+
+                        ////in our commands, we must have come across empty line.
+                        if (string.IsNullOrEmpty(CmdItem))
+                            continue;
+
+                        //if (!CmdItem.Equals("exit", StringComparison.OrdinalIgnoreCase))
+                        //{
+                        //    //Prepare to exit after closing comms
+
+                        //}
+
+                        string sOut;
+                        int rVal;
+
+                        rVal = ProcessCommands(CmdItem, out sOut);
+
+                        switch (rVal)
+                        {
+                            //case -1: //in our commands, we must have come across empty line.
+                            //    System.Console.WriteLine("    *** NULL LINE ***");
+                            //    break;
+
+                            case (int)OPERATIONS.Download: //download a file
+                                string[] sRemoteLocalFile = sOut.Split(new Char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                                if (sRemoteLocalFile.Length > 2)
+                                {
+                                    System.Console.WriteLine("ERROR! Download config not right. Use @download [remote file] [local file]");
+                                    break;
+                                }
+
+                                System.Console.WriteLine("\tDownloading: {0} {1}", sRemoteLocalFile[0], sRemoteLocalFile[1]);
+
+                                if (!bDryRun)
+                                {
+                                    sshconn.Download(sRemoteLocalFile[0], sRemoteLocalFile[1]);
+                                }
+                                break;
+
+                            case (int)OPERATIONS.Upload: //upload a file
+                                string[] sLocalRemoteFile = sOut.Split(new Char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                                if (sLocalRemoteFile.Length > 2)
+                                {
+                                    System.Console.WriteLine("ERROR! Upload config not right. Use @upload [local file] [remote file]");
+                                    break;
+                                }
+
+
+                                System.Console.WriteLine("\tUploading: {0} {1}", sshconn.FilePathSepClean(sLocalRemoteFile[0]), sshconn.FilePathSepClean(sLocalRemoteFile[1]));
+
+                                if (!bDryRun)
+                                {
+                                    try
+                                    {
+                                        sshconn.Upload(sLocalRemoteFile[0], sLocalRemoteFile[1]);
+                                    }
+                                    catch (Exception ex)
+                                    {
+
+                                    }
+
+                                }
+
+                                break;
+                            case (int)OPERATIONS.Reboot: //reboot
+                                List<string> cmdListReboot = new List<string>();
+                                System.Console.WriteLine("    *** REBOOTING ***");
+
+                                cmdListReboot = CmdUtils.Reboot();
+                                if (cmdListReboot.Count > 0)
+                                {
+                                    foreach (string cmd in cmdListReboot)
+                                    {
+                                        if (!bDryRun)
+                                        {
+                                            Dictionary<int, string> retvals = new Dictionary<int, string>(sshconn.ExecuteCommandEx(cmd));
+                                            string Result = retvals.First().Value;
+                                            System.Console.WriteLine("\tCMD (internal) {0}{1}", cmd, Result);
+                                        }
+                                        else
+                                        {
+                                            System.Console.WriteLine("\tCMD (internal) {0}", cmd);
+                                        }
+                                    }
+                                }
+                                break;
+
+                            case (int)OPERATIONS.SysInfo: //sysinfo
+                                List<string> cmdList = new List<string>();
+                                System.Console.WriteLine("    *** SYSINFO ***");
+                                cmdList = CmdUtils.SystemInfo();
+
+                                if (cmdList.Count > 0)
+                                {
+                                    foreach (string cmd in cmdList)
+                                    {
+                                        if (!bDryRun)
+                                        {
+                                            Dictionary<int, string> retvals = new Dictionary<int, string>(sshconn.ExecuteCommandEx(cmd));
+                                            string Result = retvals.First().Value;
+                                            System.Console.WriteLine("\tCMD (internal) {0}{1}", cmd, Result);
+                                        }
+                                        else
+                                        {
+                                            System.Console.WriteLine("\tCMD (internal) {0}", cmd);
+                                        }
+                                    }
+                                }
+
+
+                                break;
+                        }
+
+                        //Custom commands huh? then continue on...
+                        if (rVal >= 1010)
+                            continue;
+                        else
+                        {
+                            System.Console.WriteLine("\tCMD -> {0}", CmdItem);
+                            //This needs to be put into encapsulation. sshconn exposed.
+                            if (!bDryRun)
+                            {
+                                //var sRetVal = sshconn.ExecuteCmd(CmdItem);
+                                //Disabled above command because we're already running commands via CreateShell
+
+                                //Dictionary<int, string> retvals = new Dictionary<int, string>(sshconn.ExecuteCommandEx(CmdItem));
+                                //int ExitStatus = retvals.First().Key;
+                                //string Result = retvals.First().Value;
+                                //System.Console.WriteLine($"        Return Code: {ExitStatus} Result:\n{Result}");
+                                //System.Console.WriteLine($"        Result:\n{sRetVal}");
+
+                            }
+                        }
+
+
+
+                        //Delay 
+                        if ((ServerItem.Delay != string.Empty) || (ServerItem.Delay != null))
+                        {
+                            if (ServerItem.Delay != "0")
+                            {
+                                System.Console.WriteLine("  Delaying in seconds: {0}", ServerItem.Delay);
+                                System.Threading.Thread.Sleep(Int32.Parse(ServerItem.Delay) * 1000);
+                            }
+                        }
+
+
+
+                    } while (!CmdItem.Equals("exit", StringComparison.OrdinalIgnoreCase));
+
+
+                    //if (ServerItem.Reboot != null)
+                    //{
+                    //    if (ServerItem.Reboot.ToLower() == "true")
+                    //        System.Console.WriteLine("Rebooting Server ID  : {0} [{1}]\n", ServerItem.ID, ServerItem.Name);
+                    //}
+
+
+                    
+                    shellStreamSSH.Close();
+
+
+                } //End if server id check
+
+            } //End of while not bComplete loop...
+
+
+            if (sshconn.IsAllConnected)
+                sshconn.Disconnect();
+
+        }
+
+
+        //COMPLETE
+        //This function is the main work horse to process through servers and enable automation from the config files.
         public static void StartSvrWorkByID(string serverID="@all")
         {
 
@@ -610,15 +1256,23 @@ namespace com.repeater.program
                         if (bDryRun)
                         {
                             //Well, we have to load up all the command lines in both windows/linux/mac because we don't know the OS.
-                            ServerItem.Cmds = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile);
+                            if (oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile !=null)
+                                ServerItem.Cmds = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile);
+
                             //ServerItem.Cmds = CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile);
                             //List<string> tmpCmds = new List<string>(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalWinCommandFile));
-                            List<string> tmpCmds2 = new List<string>(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile));
-//                            ServerItem.Cmds.Add("--WINDOWS COMMANDS---");
+                            //List<string> tmpCmds2 = new List<string>(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile));
+                            //                            ServerItem.Cmds.Add("--WINDOWS COMMANDS---");
                             //ServerItem.Cmds.AddRange(tmpCmds);
-//                            ServerItem.Cmds.Add("--LINUX/MAC COMMANDS---");
-                            ServerItem.Cmds.AddRange(tmpCmds2);
+                            //                            ServerItem.Cmds.Add("--LINUX/MAC COMMANDS---");
+                            //ServerItem.Cmds.AddRange(tmpCmds2);
 
+                            List<string> tmpCmds2 = new List<string>();
+
+                            if (oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile != null)
+                            {
+                                tmpCmds2.AddRange(CmdUtils.LoadGlobalCommandFile(oConfigs.oConfigOptions.AppConfig.GlobalLinuxCommandFile));
+                            }
                         }
 
                         if (ServerItem.Cmds == null)
